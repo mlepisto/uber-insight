@@ -533,6 +533,8 @@ function render(){
   // blocks
   const host=$("#blocks"); host.innerHTML="";
   blocks.forEach(b=>{
+    // Today: hide blocks that ended more than 30 min ago — history doesn't help.
+    if(isToday && (b.m+30)<=(nowMin-30)) return;
     const t=fmtBlock(b.m);
     const tier=tierFor(b.score,maxScore);
     const el=document.createElement("div");
