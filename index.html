@@ -1,0 +1,599 @@
+<title>OGG Wave Board</title>
+<meta name="description" content="A Maui rideshare planning board: OGG commercial arrivals and Kahului cruise calls, bucketed into 30-minute waves by arriving seats." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" />
+<style>
+  :root{
+    --ground:#F2EEE6;         /* warm sand */
+    --surface:#FFFFFF;
+    --surface-2:#FBF9F4;
+    --line:#E2DBCE;
+    --ink:#182A31;            /* deep teal-ink */
+    --muted:#5E6E74;
+    --faint:#8A979C;
+    --accent:#E4572E;         /* sunset coral */
+    --accent-soft:#FBE3DA;
+    --teal:#0E7C7B;           /* cruise */
+    --teal-soft:#D8ECEB;
+    --amber:#D8930B;
+    --good:#2E8B57;
+    --bar-track:#EDE7DB;
+    --shadow:0 1px 2px rgba(24,42,49,.06), 0 6px 20px rgba(24,42,49,.05);
+    --board-bg:#12242B;       /* departure-board panel, fixed dark in both themes */
+    --board-ink:#F4EEDF;
+    --board-amber:#F5B841;
+  }
+  :root:not([data-theme="light"]){
+    @media (prefers-color-scheme: dark){
+      --ground:#0D1A20;
+      --surface:#132630;
+      --surface-2:#0F2027;
+      --line:#223A44;
+      --ink:#EAF1F0;
+      --muted:#9BB0B6;
+      --faint:#6E858C;
+      --accent:#FF7A54;
+      --accent-soft:#3A2119;
+      --teal:#37B2AC;
+      --teal-soft:#12312F;
+      --amber:#F0B33C;
+      --good:#5BC489;
+      --bar-track:#1C333C;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+      --board-bg:#0A171C;
+      --board-ink:#F4EEDF;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0D1A20;
+    --surface:#132630;
+    --surface-2:#0F2027;
+    --line:#223A44;
+    --ink:#EAF1F0;
+    --muted:#9BB0B6;
+    --faint:#6E858C;
+    --accent:#FF7A54;
+    --accent-soft:#3A2119;
+    --teal:#37B2AC;
+    --teal-soft:#12312F;
+    --amber:#F0B33C;
+    --good:#5BC489;
+    --bar-track:#1C333C;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    --board-bg:#0A171C;
+    --board-ink:#F4EEDF;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--ground);color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    line-height:1.45;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding-inline:16px;padding-block:0 40px}
+  h1,h2,h3{margin:0}
+  .tnum{font-variant-numeric:tabular-nums}
+
+  /* ---- sticky board header ---- */
+  header{
+    position:sticky;top:env(safe-area-inset-top,0px);z-index:20;
+    background:var(--board-bg);color:var(--board-ink);
+    margin-inline:-16px;padding:14px 16px 12px;
+    border-bottom:2px solid rgba(245,184,65,.35);
+  }
+  .board-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .board-code{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:30px;letter-spacing:1px;line-height:1}
+  .board-code small{font-family:"IBM Plex Sans";font-weight:500;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--board-amber);display:block;margin-top:2px;letter-spacing:.16em}
+  .clock{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;line-height:1;color:var(--board-amber)}
+  .clock .cd{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(244,238,223,.6);text-align:right;font-family:"IBM Plex Sans";font-weight:500;margin-top:3px}
+  .daystrip{display:flex;gap:6px;overflow-x:auto;margin-top:12px;padding-bottom:2px;scrollbar-width:none}
+  .daystrip::-webkit-scrollbar{display:none}
+  .daychip{flex:0 0 auto;border:1px solid rgba(244,238,223,.22);background:transparent;color:var(--board-ink);
+    border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;line-height:1.2;text-align:center}
+  .daychip small{display:block;font-weight:500;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(244,238,223,.55)}
+  .daychip[aria-pressed="true"]{background:var(--board-amber);color:#12242B;border-color:var(--board-amber)}
+  .daychip[aria-pressed="true"] small{color:rgba(18,36,43,.7)}
+  .daychip.hascruise::after{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--teal);margin-left:5px;vertical-align:middle}
+
+  /* ---- now card ---- */
+  .now{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+    padding:16px;margin-top:16px}
+  .now-head{display:flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 rgba(46,139,87,.5);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(46,139,87,.45)}70%{box-shadow:0 0 0 9px rgba(46,139,87,0)}100%{box-shadow:0 0 0 0 rgba(46,139,87,0)}}
+  @media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+  .now-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+  .stat .k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .stat .v{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:34px;line-height:1;margin-top:3px}
+  .stat .v small{font-family:"IBM Plex Sans";font-weight:500;font-size:13px;color:var(--muted)}
+  .stat .sub{font-size:12px;color:var(--muted);margin-top:3px}
+  .next-wave{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .nw-pill{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:15px;letter-spacing:.04em;padding:5px 10px;border-radius:8px;background:var(--accent-soft);color:var(--accent)}
+  .nw-txt{font-size:13px;color:var(--muted)}
+  .nw-txt b{color:var(--ink)}
+
+  /* ---- cruise banner ---- */
+  .cruise{display:flex;gap:12px;align-items:flex-start;background:var(--teal-soft);border:1px solid var(--teal);
+    border-left-width:4px;border-radius:12px;padding:12px 14px;margin-top:14px}
+  .cruise .ic{flex:0 0 auto;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:13px;letter-spacing:.06em;
+    color:var(--teal);text-transform:uppercase;padding-top:1px}
+  .cruise .body{font-size:13px}
+  .cruise .body b{font-size:15px;font-family:"Barlow Condensed",sans-serif;letter-spacing:.02em;font-weight:700}
+  .cruise .meta{color:var(--muted);margin-top:2px}
+
+  /* ---- section label ---- */
+  .seclab{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:26px 4px 10px}
+  .seclab h2{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:20px;letter-spacing:.02em}
+  .seclab .hint{font-size:12px;color:var(--faint)}
+
+  /* ---- blocks ---- */
+  .blocks{display:flex;flex-direction:column;gap:7px}
+  .block{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .block.empty{background:transparent;border-style:dashed;opacity:.6}
+  .block.current{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  .block.past{opacity:.5}
+  .brow{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;padding:11px 13px;cursor:pointer;width:100%;background:none;border:0;text-align:left;color:inherit;font:inherit}
+  .btime{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:17px;line-height:1.05;letter-spacing:.02em}
+  .btime small{display:block;font-family:"IBM Plex Sans";font-size:10px;font-weight:500;color:var(--faint);letter-spacing:.04em}
+  .bmid{min-width:0}
+  .bbar-track{height:8px;background:var(--bar-track);border-radius:999px;overflow:hidden}
+  .bbar{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--amber),var(--accent))}
+  .bmeta{display:flex;gap:10px;align-items:center;margin-top:5px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .bmeta .seats{font-weight:600;color:var(--ink)}
+  .wb{color:var(--teal);font-weight:600}
+  .bright{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+  .tier{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:7px}
+  .tier.quiet{background:var(--surface-2);color:var(--faint);border:1px solid var(--line)}
+  .tier.steady{background:var(--teal-soft);color:var(--teal)}
+  .tier.busy{background:#F6E6C8;color:var(--amber)}
+  .tier.peak{background:var(--accent-soft);color:var(--accent)}
+  :root[data-theme="dark"] .tier.busy,:root:not([data-theme="light"]) .tier.busy{background:#3a2f14}
+  .chev{color:var(--faint);font-size:12px}
+  .flights{display:none;padding:2px 13px 12px;border-top:1px solid var(--line)}
+  .block[aria-expanded="true"] .flights{display:block}
+  .flt{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .flt:last-child{border-bottom:0}
+  .flt .ft{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:15px}
+  .flt .fo b{font-weight:600}
+  .flt .fo span{color:var(--muted);font-size:12px}
+  .flt .fac{text-align:right;font-size:12px;color:var(--muted);white-space:nowrap}
+  .flt .fac b{display:block;color:var(--ink);font-size:13px;font-weight:600}
+  .tag-wb{color:var(--teal)}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:14px 4px 0}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+
+  /* ---- settings / live ---- */
+  details.live{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+  details.live>summary{list-style:none;cursor:pointer;padding:14px 16px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  details.live>summary::-webkit-details-marker{display:none}
+  .livedot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+  .livedot.on{background:var(--good)}
+  .livebody{padding:0 16px 16px;font-size:13px;color:var(--muted)}
+  .livebody label{display:block;font-weight:600;color:var(--ink);margin:10px 0 5px;font-size:12px}
+  .livebody input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--ink);font:inherit}
+  .btnrow{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  button.act{font:inherit;font-weight:600;border:0;border-radius:9px;padding:10px 14px;cursor:pointer}
+  button.primary{background:var(--accent);color:#fff}
+  button.ghost{background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
+  .livemsg{margin-top:10px;font-size:12px}
+  .livemsg.err{color:var(--accent)}
+  .livemsg.ok{color:var(--good)}
+
+  footer{margin-top:26px;font-size:11.5px;color:var(--faint);line-height:1.6;border-top:1px solid var(--line);padding-top:16px}
+  footer b{color:var(--muted)}
+  code{background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="board-top">
+      <div>
+        <div class="board-code">OGG<small>Kahului · Maui Arrivals</small></div>
+      </div>
+      <div>
+        <div class="clock tnum" id="clock">--:--</div>
+        <div class="cd" id="clockday">Hawai‘i Time</div>
+      </div>
+    </div>
+    <div class="daystrip" id="daystrip"></div>
+  </header>
+
+  <section class="now" id="nowcard" aria-live="polite">
+    <div class="now-head"><span class="pulse" id="nowpulse"></span> <span id="nowlabel">Right now at OGG</span></div>
+    <div class="now-grid">
+      <div class="stat">
+        <div class="k">This 30-min block</div>
+        <div class="v tnum"><span id="nowseats">0</span> <small>seats</small></div>
+        <div class="sub" id="nowflights">no arrivals</div>
+      </div>
+      <div class="stat">
+        <div class="k">Landing next 90 min</div>
+        <div class="v tnum"><span id="soonseats">0</span> <small>seats</small></div>
+        <div class="sub" id="soonflights">across 0 flights</div>
+      </div>
+    </div>
+    <div class="next-wave" id="nextwave"></div>
+  </section>
+
+  <div id="cruisehost"></div>
+
+  <div class="seclab">
+    <h2 id="daytitle">Today</h2>
+    <span class="hint">30-min waves · seats arriving</span>
+  </div>
+  <div class="blocks" id="blocks"></div>
+
+  <div class="legend">
+    <span><i class="sw" style="background:linear-gradient(90deg,var(--amber),var(--accent))"></i> wave size = seats arriving</span>
+    <span><i class="sw" style="background:var(--teal)"></i> widebody (big load)</span>
+    <span><i class="sw" style="background:var(--accent)"></i> peak = best odds</span>
+  </div>
+
+  <details class="live" id="livepanel">
+    <summary><span>Live status overlay <span style="font-weight:400;color:var(--faint)">— optional</span></span><span class="livedot" id="livedot"></span></summary>
+    <div class="livebody">
+      <p>The board runs fully offline on a typical OGG timetable. To pull <b>real delays / actual landings for today</b>, paste a free
+      <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">AeroDataBox</a> RapidAPI key (free tier, no card). It stays in your browser only. This layer is experimental.</p>
+      <label for="akey">AeroDataBox RapidAPI key</label>
+      <input id="akey" type="password" placeholder="paste key — stored on this device only" autocomplete="off" />
+      <div class="btnrow">
+        <button class="act primary" id="golive">Fetch today’s live arrivals</button>
+        <button class="act ghost" id="clearlive">Clear &amp; go offline</button>
+      </div>
+      <div class="livemsg" id="livemsg"></div>
+    </div>
+  </details>
+
+  <footer>
+    <p><b>How to read it.</b> Each row is a 30-minute window. The bar and seat count are how many arriving seats hit the curb in that window — bigger bar, bigger wave of people needing a ride. Mainland and widebody arrivals are weighted heavier than interisland (visitors with bags and hotel trips beat locals on a short hop). <b>Peak</b> blocks are your best odds; stage before them, not during.</p>
+    <p><b>On the data.</b> Flights are a realistic <b>typical OGG weekday/weekend template</b> — airlines, routes, aircraft and seat counts are real, but exact times and flight numbers drift, so treat it as a planning pattern, not a live tower feed. Verify big days against FlightAware. Turn on the live overlay above for actual delays/landings. Cruise calls are the recurring Kahului Harbor pattern (Pride of America overnights weekly) plus flagged examples — <b>confirm dates on the Maui / Kahului Harbor cruise schedule</b> before banking a cruise day.</p>
+    <p style="margin-top:8px;color:var(--faint)">Seats are per-aircraft estimates. All times Hawai‘i Standard Time (HST, no DST).</p>
+  </footer>
+</div>
+
+<script>
+/* ============================ DATA ============================ */
+// Seats by aircraft type (typical single-carrier config).
+const AC = {
+  "717":{s:128,cls:"Regional jet",wb:false,name:"Boeing 717"},
+  "73W":{s:143,cls:"Narrowbody",wb:false,name:"737-700"},
+  "738":{s:166,cls:"Narrowbody",wb:false,name:"737-800"},
+  "739":{s:178,cls:"Narrowbody",wb:false,name:"737-900ER"},
+  "7M8":{s:175,cls:"Narrowbody",wb:false,name:"737 MAX 8"},
+  "7M9":{s:178,cls:"Narrowbody",wb:false,name:"737 MAX 9"},
+  "A21N":{s:189,cls:"Narrowbody",wb:false,name:"A321neo"},
+  "321":{s:190,cls:"Narrowbody",wb:false,name:"A321"},
+  "752":{s:199,cls:"Narrowbody",wb:false,name:"757-200"},
+  "A332":{s:278,cls:"Widebody",wb:true,name:"A330-200"},
+  "788":{s:243,cls:"Widebody",wb:true,name:"787-8"},
+  "789":{s:257,cls:"Widebody",wb:true,name:"787-9"},
+  "764":{s:240,cls:"Widebody",wb:true,name:"767-400"}
+};
+const AIRLINE = {HA:"Hawaiian",AS:"Alaska",UA:"United",DL:"Delta",AA:"American",WN:"Southwest",WS:"WestJet",AC:"Air Canada",G4:"Allegiant",SY:"Sun Country"};
+const INTERISLAND = new Set(["HNL","KOA","LIH","ITO","MKK","LNY"]);
+const CITY = {
+  HNL:"Honolulu",KOA:"Kona",LIH:"Līhu‘e",ITO:"Hilo",
+  LAX:"Los Angeles",SFO:"San Francisco",SEA:"Seattle",PDX:"Portland",SAN:"San Diego",
+  SJC:"San Jose",OAK:"Oakland",SMF:"Sacramento",LAS:"Las Vegas",PHX:"Phoenix",
+  DEN:"Denver",SLC:"Salt Lake City",DFW:"Dallas",ORD:"Chicago",EWR:"Newark",ANC:"Anchorage",YVR:"Vancouver"
+};
+
+// Typical daily arrivals (HST). [time,"FLT","carrier","origin","actype"]
+// Interisland core (Hawaiian 717 shuttle + Southwest) — runs every day.
+const INTER = [
+  ["06:05","HA151","HA","HNL","717"],["06:55","HA153","HA","HNL","717"],["07:20","WN1210","WN","HNL","73W"],
+  ["07:45","HA155","HA","HNL","717"],["08:10","HA402","HA","KOA","717"],["08:35","HA157","HA","HNL","717"],
+  ["09:25","HA159","HA","HNL","717"],["09:40","WN1450","WN","HNL","73W"],["10:15","HA161","HA","HNL","717"],
+  ["10:40","HA320","HA","LIH","717"],["11:05","HA163","HA","HNL","717"],["11:55","HA165","HA","HNL","717"],
+  ["12:10","WN2033","WN","HNL","73W"],["12:45","HA167","HA","HNL","717"],["13:20","HA404","HA","KOA","717"],
+  ["13:35","HA169","HA","HNL","717"],["14:25","HA171","HA","HNL","717"],["14:40","WN2210","WN","HNL","73W"],
+  ["15:15","HA173","HA","HNL","717"],["15:50","HA322","HA","LIH","717"],["16:05","HA175","HA","HNL","717"],
+  ["16:55","HA177","HA","HNL","717"],["17:10","WN1875","WN","HNL","73W"],["17:30","HA406","HA","KOA","717"],
+  ["17:45","HA179","HA","HNL","717"],["18:35","HA181","HA","HNL","717"],["19:25","HA183","HA","HNL","717"],
+  ["19:40","WN2461","WN","HNL","73W"],["20:15","HA185","HA","HNL","717"]
+];
+// Mainland / intl arrivals — every day.
+const MAIN = [
+  ["10:55","UA1149","UA","SFO","738"],["11:20","AS867","AS","SFO","739"],["11:50","HA23","HA","SMF","A21N"],
+  ["12:10","WN1900","WN","OAK","7M8"],["12:20","HA5","HA","LAX","A21N"],["12:35","AS823","AS","SEA","739"],
+  ["12:50","AS879","AS","OAK","738"],["12:55","AA285","AA","LAX","321"],["13:10","AS731","AS","PDX","738"],
+  ["13:25","UA491","UA","LAX","739"],["13:40","HA25","HA","SFO","A21N"],["13:50","DL417","DL","LAX","739"],
+  ["14:05","AS835","AS","SJC","738"],["14:20","UA1099","UA","DEN","752"],["14:35","AA663","AA","PHX","321"],
+  ["14:50","HA27","HA","SEA","A21N"],["15:10","DL621","DL","SEA","739"],["15:20","AS891","AS","SAN","739"],
+  ["15:30","HA29","HA","PDX","A21N"],["15:35","WN2288","WN","SJC","738"],["15:55","UA795","UA","SFO","739"],
+  ["16:05","AC1815","AC","YVR","7M8"],["16:20","AA1610","AA","DFW","321"],["16:40","HA9","HA","SAN","A21N"],
+  ["16:45","DL789","DL","SLC","739"],["17:20","HA15","HA","LAS","A21N"],["17:50","UA1731","UA","EWR","788"],
+  ["18:10","HA33","HA","PHX","A21N"],["18:20","WN345","WN","SAN","7M8"],["19:00","HA37","HA","OAK","A21N"],
+  ["20:20","UA1205","UA","SFO","739"],["20:40","HA11","HA","LAX","A332"]
+];
+// Weekend-only extra lift (Fri/Sat/Sun heavier from mainland).
+const WKND = [
+  ["11:35","AS461","AS","LAX","739"],["13:05","WN1122","WN","LAS","7M8"],["14:10","DL289","DL","LAX","A332"],
+  ["15:45","AS289","AS","ANC","738"],["16:30","UA363","UA","ORD","788"],["19:20","HA13","HA","SFO","A21N"],
+  ["21:10","DL621","DL","LAX","A332"]
+];
+
+// Cruise: recurring weekly rule + explicit flagged examples (verify against Kahului Harbor schedule).
+// dow: 0=Sun..6=Sat. Pride of America overnights in Kahului on its 7-night interisland loop.
+const CRUISE_WEEKLY = [
+  {dow:1,ship:"Pride of America",line:"Norwegian",pax:2186,inn:"08:00",out:null,overnight:true,note:"overnights — passengers ashore all day & evening"},
+  {dow:2,ship:"Pride of America",line:"Norwegian",pax:2186,inn:null,out:"18:00",overnight:false,note:"sails ~6pm — back-to-port rush late afternoon"}
+];
+// Extra dated calls (YYYY-MM-DD). Examples, clearly flagged.
+const CRUISE_DATED = {
+  // e.g. "2026-09-24":[{ship:"Grand Princess",line:"Princess",pax:2600,inn:"07:00",out:"17:00",note:"tender port day"}]
+};
+
+/* ============================ ENGINE ============================ */
+const $ = s=>document.querySelector(s);
+const pad = n=>String(n).padStart(2,"0");
+const HST_OFFSET = -10*60; // minutes from UTC, no DST
+
+function hstNow(){
+  const d = new Date();
+  const utc = d.getTime() + d.getTimezoneOffset()*60000;
+  return new Date(utc + HST_OFFSET*60000);
+}
+function ymd(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const toMin = t=>{const[a,b]=t.split(":").map(Number);return a*60+b;};
+
+// Origin weight: how likely arriving seats convert to a good rideshare fare.
+function weight(o){
+  if(!INTERISLAND.has(o)) return 1.0;      // mainland/intl visitors, bags, hotels
+  if(o==="HNL") return 0.35;               // short interisland hop, many locals
+  return 0.45;
+}
+
+function flightsForDate(d){
+  const dow = d.getDay();
+  const weekend = (dow===0||dow===5||dow===6);
+  let list = INTER.concat(MAIN);
+  if(weekend) list = list.concat(WKND);
+  return list.map(f=>{
+    const ac = AC[f[4]]||{s:150,cls:"Jet",wb:false,name:f[4]};
+    return {min:toMin(f[0]),time:f[0],flt:f[1],carrier:f[2],org:f[3],ac:f[4],
+            seats:ac.s,wb:ac.wb,cls:ac.cls,acname:ac.name,inter:INTERISLAND.has(f[3])};
+  }).sort((a,b)=>a.min-b.min);
+}
+
+function cruiseForDate(d){
+  const out=[];
+  const key=ymd(d);
+  CRUISE_WEEKLY.filter(c=>c.dow===d.getDay()).forEach(c=>out.push(c));
+  (CRUISE_DATED[key]||[]).forEach(c=>out.push(c));
+  return out;
+}
+
+// Build 30-min blocks from 05:00 to 23:30.
+const START=5*60, END=23*60+30;
+function buildBlocks(flights){
+  const blocks=[];
+  for(let m=START;m<=END;m+=30){
+    const fl = flights.filter(f=>f.min>=m && f.min<m+30);
+    const seats = fl.reduce((s,f)=>s+f.seats,0);
+    const score = Math.round(fl.reduce((s,f)=>s+f.seats*weight(f.org),0));
+    blocks.push({m,fl,seats,score,wb:fl.some(f=>f.wb)});
+  }
+  return blocks;
+}
+function tierFor(score,maxScore){
+  if(score<=0) return null;
+  const r = score/(maxScore||1);
+  if(r>=0.75) return "peak";
+  if(r>=0.45) return "busy";
+  if(r>=0.15) return "steady";
+  return "quiet";
+}
+const TIERLABEL={peak:"Peak",busy:"Busy",steady:"Steady",quiet:"Quiet"};
+function fmtBlock(m){
+  const h=Math.floor(m/60),mm=m%60;
+  const h2=Math.floor((m+30)/60),mm2=(m+30)%60;
+  const ap=h>=12?"p":"a", ap2=h2>=12?"p":"a";
+  const hh=((h+11)%12)+1, hh2=((h2+11)%12)+1;
+  return {a:hh+":"+pad(mm), b:hh2+":"+pad(mm2)+ap2};
+}
+
+/* ============================ STATE + RENDER ============================ */
+let SEL=0; // day offset
+let liveData=null; // map flt->status when live overlay on
+
+function render(){
+  const now = hstNow();
+  const day = addDays(now, SEL);
+  const flights = flightsForDate(day);
+  const blocks = buildBlocks(flights);
+  const maxScore = Math.max(1,...blocks.map(b=>b.score));
+  const maxSeats = Math.max(1,...blocks.map(b=>b.seats));
+  const nowMin = now.getHours()*60+now.getMinutes();
+  const isToday = SEL===0;
+
+  // day title
+  $("#daytitle").textContent = SEL===0?"Today · "+DOW[day.getDay()]+" "+MON[day.getMonth()]+" "+day.getDate()
+    : DOW[day.getDay()]+" · "+MON[day.getMonth()]+" "+day.getDate();
+
+  // cruise
+  const cruises = cruiseForDate(day);
+  const ch = $("#cruisehost"); ch.innerHTML="";
+  cruises.forEach(c=>{
+    const div=document.createElement("div");div.className="cruise";
+    const when = c.overnight ? "In port from "+to12(c.inn)+" — overnight"
+      : c.inn && c.out ? "In port "+to12(c.inn)+"–"+to12(c.out)
+      : c.out ? "Departs "+to12(c.out) : "In port";
+    div.innerHTML='<div class="ic">Cruise</div><div class="body"><b>'+c.ship+'</b> · '+c.line+
+      ' · ~'+c.pax.toLocaleString()+' pax<div class="meta">'+when+' — '+c.note+'</div></div>';
+    ch.appendChild(div);
+  });
+
+  // NOW card (only meaningful for today; for future days show day totals)
+  const pulse=$("#nowpulse");
+  if(isToday){
+    $("#nowlabel").textContent="Right now at OGG";
+    pulse.style.display="";
+    const cur = blocks.find(b=>nowMin>=b.m && nowMin<b.m+30);
+    $("#nowseats").textContent = cur?cur.seats:0;
+    $("#nowflights").textContent = cur&&cur.fl.length? cur.fl.length+" flight"+(cur.fl.length>1?"s":"")+" landing" : "no arrivals this block";
+    // next 90 min
+    const soon = flights.filter(f=>f.min>=nowMin && f.min<nowMin+90);
+    $("#soonseats").textContent = soon.reduce((s,f)=>s+f.seats,0);
+    $("#soonflights").textContent = "across "+soon.length+" flight"+(soon.length!==1?"s":"");
+  }else{
+    $("#nowlabel").textContent="Day outlook";
+    pulse.style.display="none";
+    const tot=flights.reduce((s,f)=>s+f.seats,0);
+    const wb=flights.filter(f=>f.wb).length;
+    $("#nowseats").textContent=tot.toLocaleString();
+    $("#nowflights").textContent=flights.length+" arrivals";
+    $("#soonseats").textContent=wb;
+    $("#soonflights").textContent="widebody arrivals (big loads)";
+  }
+
+  // next best wave (today: upcoming; future: peak of day)
+  const nw=$("#nextwave");
+  let target;
+  if(isToday){ target = blocks.filter(b=>b.m+30>nowMin && b.score>0).sort((a,b)=>b.score-a.score)[0]; }
+  else { target = blocks.filter(b=>b.score>0).sort((a,b)=>b.score-a.score)[0]; }
+  if(target){
+    const t=fmtBlock(target.m);
+    const tier=tierFor(target.score,maxScore);
+    let lead = isToday ? "Next best window" : "Best window today";
+    let cd="";
+    if(isToday){
+      const diff=target.m-nowMin;
+      cd = diff<=0 ? "happening now" : "in "+(diff>=60?Math.floor(diff/60)+"h "+(diff%60)+"m":diff+" min");
+    }
+    nw.innerHTML='<span class="nw-pill">'+t.a+"–"+t.b+'</span><span class="nw-txt"><b>'+lead+'</b> · '
+      +target.seats+' seats'+(target.wb?' · widebody':'')+(cd?' · '+cd:'')+'</span>';
+  }else{ nw.innerHTML='<span class="nw-txt">No more arrivals scheduled today.</span>'; }
+
+  // blocks
+  const host=$("#blocks"); host.innerHTML="";
+  blocks.forEach(b=>{
+    const t=fmtBlock(b.m);
+    const tier=tierFor(b.score,maxScore);
+    const el=document.createElement("div");
+    el.className="block"+(b.fl.length?"":" empty");
+    if(isToday && nowMin>=b.m && nowMin<b.m+30) el.classList.add("current");
+    if(isToday && b.m+30<=nowMin) el.classList.add("past");
+    el.setAttribute("aria-expanded","false");
+
+    const barW = Math.round(b.seats/maxSeats*100);
+    let flHTML="";
+    b.fl.forEach(f=>{
+      const live = liveData && liveData[f.flt];
+      const st = live? '<span style="color:'+(live.landed?'var(--good)':'var(--accent)')+';font-weight:600"> · '+live.txt+'</span>':'';
+      flHTML+='<div class="flt"><div class="ft">'+f.flt+'</div>'+
+        '<div class="fo"><b>'+(AIRLINE[f.carrier]||f.carrier)+'</b> <span>from '+(CITY[f.org]||f.org)+(f.inter?" (interisland)":"")+'</span>'+st+'</div>'+
+        '<div class="fac"><b>'+f.seats+' seats</b>'+f.acname+(f.wb?' <span class="tag-wb">▪ widebody</span>':'')+'</div></div>';
+    });
+
+    el.innerHTML =
+      '<button class="brow" type="button">'+
+        '<div class="btime">'+t.a+'<small>'+t.b+'</small></div>'+
+        '<div class="bmid">'+
+          '<div class="bbar-track"><div class="bbar" style="width:'+(b.fl.length?Math.max(6,barW):0)+'%"></div></div>'+
+          '<div class="bmeta">'+(b.fl.length?
+              '<span class="seats">'+b.seats+' seats</span><span>'+b.fl.length+' flight'+(b.fl.length>1?'s':'')+'</span>'+(b.wb?'<span class="wb">▪ widebody</span>':'')
+              :'<span>—</span>')+'</div>'+
+        '</div>'+
+        '<div class="bright">'+(tier?'<span class="tier '+tier+'">'+TIERLABEL[tier]+'</span>':'<span class="chev">·</span>')+
+          (b.fl.length?'<span class="chev" data-c>▾ flights</span>':'')+'</div>'+
+      '</button>'+
+      (b.fl.length?'<div class="flights">'+flHTML+'</div>':'');
+
+    if(b.fl.length){
+      el.querySelector(".brow").addEventListener("click",()=>{
+        const open=el.getAttribute("aria-expanded")==="true";
+        el.setAttribute("aria-expanded",open?"false":"true");
+        const c=el.querySelector("[data-c]"); if(c) c.textContent=open?"▾ flights":"▴ hide";
+      });
+    }
+    host.appendChild(el);
+  });
+
+  // scroll current block into center on today
+  if(isToday){
+    const cur=host.querySelector(".block.current");
+    if(cur && !render._scrolled){ render._scrolled=true;
+      setTimeout(()=>cur.scrollIntoView({block:"center",behavior:"smooth"}),120); }
+  }
+}
+function to12(t){if(!t)return"";const[h,m]=t.split(":").map(Number);const ap=h>=12?"pm":"am";return(((h+11)%12)+1)+":"+pad(m)+ap;}
+
+/* ---- day strip ---- */
+function buildStrip(){
+  const now=hstNow(); const strip=$("#daystrip"); strip.innerHTML="";
+  for(let i=0;i<8;i++){
+    const d=addDays(now,i);
+    const has=cruiseForDate(d).length>0;
+    const b=document.createElement("button");
+    b.className="daychip"+(has?" hascruise":"");
+    b.setAttribute("aria-pressed", i===SEL?"true":"false");
+    b.innerHTML=(i===0?"Today":DOW[d.getDay()])+"<small>"+MON[d.getMonth()]+" "+d.getDate()+"</small>";
+    b.addEventListener("click",()=>{SEL=i;render._scrolled=false;buildStrip();render();window.scrollTo({top:0,behavior:"smooth"});});
+    strip.appendChild(b);
+  }
+}
+
+/* ---- clock ---- */
+function tick(){
+  const n=hstNow();
+  $("#clock").textContent=pad(n.getHours())+":"+pad(n.getMinutes());
+  $("#clockday").textContent=DOW[n.getDay()]+" · HST";
+  if(SEL===0) render();
+}
+
+/* ---- live overlay (optional, experimental) ---- */
+function loadKey(){try{return localStorage.getItem("ogg_adb_key")||"";}catch(e){return"";}}
+function saveKey(k){try{k?localStorage.setItem("ogg_adb_key",k):localStorage.removeItem("ogg_adb_key");}catch(e){}}
+function setLive(on){$("#livedot").classList.toggle("on",on);}
+async function goLive(){
+  const key=$("#akey").value.trim(); const msg=$("#livemsg");
+  if(!key){msg.className="livemsg err";msg.textContent="Paste a key first.";return;}
+  saveKey(key); msg.className="livemsg";msg.textContent="Fetching live OGG arrivals…";
+  const n=hstNow();
+  const from=pad(n.getHours())+":"+pad(n.getMinutes());
+  const to=pad((n.getHours()+11)%24)+":59";
+  // AeroDataBox: arrivals at PHOG for a 12h window (max 12h per call).
+  const url="https://aerodatabox.p.rapidapi.com/flights/airports/icao/PHOG/"+
+    ymd(n)+"T"+from+"/"+ymd(n)+"T"+to+"?direction=Arrival&withLeg=true&withCancelled=false&withCodeshared=false";
+  try{
+    const r=await fetch(url,{headers:{"X-RapidAPI-Key":key,"X-RapidAPI-Host":"aerodatabox.p.rapidapi.com"}});
+    if(!r.ok){throw new Error("HTTP "+r.status+(r.status===403?" — key/subscription issue":r.status===429?" — rate limit":""));}
+    const j=await r.json();
+    const arr=(j.arrivals||[]);
+    liveData={};
+    arr.forEach(f=>{
+      const num=(f.number||"").replace(/\s/g,"");
+      const st=(f.status||"").toLowerCase();
+      const landed=/arriv|land/.test(st);
+      const t=(f.arrival&&(f.arrival.revisedTime||f.arrival.predictedTime||f.arrival.scheduledTime));
+      const local=t&&(t.local||"").slice(11,16);
+      liveData[num]={landed,txt:landed?"landed":(st?st:(local?"ETA "+local:"tracking"))};
+    });
+    setLive(true);
+    msg.className="livemsg ok";msg.textContent="Live: matched "+arr.length+" arrivals. Status shows on today’s flights.";
+    SEL=0;buildStrip();render();
+  }catch(e){
+    setLive(false); liveData=null;
+    msg.className="livemsg err";
+    msg.textContent="Couldn’t reach live feed ("+e.message+"). Board stays on the offline timetable.";
+    render();
+  }
+}
+function clearLive(){liveData=null;$("#akey").value="";saveKey("");setLive(false);$("#livemsg").textContent="Live overlay off — using offline timetable.";$("#livemsg").className="livemsg";render();}
+
+/* ---- boot ---- */
+$("#akey").value=loadKey();
+$("#golive").addEventListener("click",goLive);
+$("#clearlive").addEventListener("click",clearLive);
+buildStrip();
+tick();
+render();
+setInterval(tick,30000);
+</script>
