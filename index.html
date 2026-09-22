@@ -286,7 +286,8 @@
     <summary><span>Live status &amp; ETAs <span style="font-weight:400;color:var(--faint)">— real delays</span></span><span class="livedot" id="livedot"></span></summary>
     <div class="livebody">
       <p>Your browser pulls arrivals <b>live, straight from the source</b> — no server. Today switches to the real feed: actual flight numbers, delays (ON TIME / LATE / LANDED), late flights re-bucketed into the window they really land in.</p>
-      <p><b>Refreshes on each page load</b> (and when you tap the LIVE badge up top). One or two API calls per load — a few opens a day stays far under the free monthly quota.</p>
+      <p><b>Updates only when you tap Update</b> (or the LIVE badge). Page loads use the cached copy — no API call. One call per Update in the afternoon/evening, two in the early morning.</p>
+      <p><b>Usage:</b> the browser can’t read the quota counter (the feed hides it from in-page scripts), so check units used on your <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">RapidAPI dashboard → Analytics</a>.</p>
       <p><b>Setup once (free, no card, ~2 min):</b> make a <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">RapidAPI account</a>, subscribe to AeroDataBox's <b>Basic (free)</b> plan, copy the key, paste it below. Saved on this device only.</p>
       <label for="akey">AeroDataBox RapidAPI key</label>
       <input id="akey" type="password" placeholder="paste key — stored on this device only" autocomplete="off" />
