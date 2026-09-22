@@ -99,7 +99,17 @@
   /* ---- now card ---- */
   .now{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
     padding:16px;margin-top:16px}
-  .now-head{display:flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .now-head{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .now-head .nh-l{display:inline-flex;align-items:center;gap:8px}
+  .upd{font-family:"IBM Plex Sans";font-weight:700;font-size:12px;letter-spacing:.02em;text-transform:none;border:1px solid var(--line);border-radius:999px;padding:6px 13px;cursor:pointer;white-space:nowrap;color:#fff;background:var(--muted)}
+  .upd.fresh{background:var(--good);border-color:transparent}
+  .upd.aging{background:var(--amber);border-color:transparent}
+  .upd.stale,.upd.err{background:var(--accent);border-color:transparent}
+  .upd.none{background:var(--surface-2);color:var(--ink)}
+  .upd.loading{background:var(--muted);color:#fff;opacity:.8}
+  .srcnote{font-size:11.5px;letter-spacing:.02em;text-transform:none;color:var(--faint);margin-top:8px;font-weight:500}
+  .srcnote.live{color:var(--good)}
+  .srcnote.err{color:var(--accent)}
   .pulse{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 rgba(46,139,87,.5);animation:pulse 2.4s infinite}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(46,139,87,.45)}70%{box-shadow:0 0 0 9px rgba(46,139,87,0)}100%{box-shadow:0 0 0 0 rgba(46,139,87,0)}}
   @media (prefers-reduced-motion:reduce){.pulse{animation:none}}
@@ -236,7 +246,11 @@
   </header>
 
   <section class="now" id="nowcard" aria-live="polite">
-    <div class="now-head"><span class="pulse" id="nowpulse"></span> <span id="nowlabel">Right now at OGG</span></div>
+    <div class="now-head">
+      <span class="nh-l"><span class="pulse" id="nowpulse"></span> <span id="nowlabel">Right now at OGG</span></span>
+      <button class="upd none" id="updatebtn" type="button">Update</button>
+    </div>
+    <div class="srcnote" id="srcnote">Sample timetable — not live data</div>
     <div class="now-grid">
       <div class="stat">
         <div class="k">This 30-min block</div>
@@ -704,7 +718,7 @@ function tick(){
   const n=hstNow();
   $("#clock").textContent=pad(n.getHours())+":"+pad(n.getMinutes());
   $("#clockday").textContent=DOW[n.getDay()]+" · HST";
-  updateLiveChip();
+  updateLiveChip(); refreshStatusUI();
   if(SEL===0) render();
 }
 
@@ -750,6 +764,11 @@ function parseArrivals(arr){
   return out.sort((a,b)=>a.effMin-b.effMin);
 }
 
+async function fetchTimeout(url,opt,ms){
+  const c=new AbortController(), id=setTimeout(()=>c.abort(),ms);
+  try{ return await fetch(url,{...opt,signal:c.signal}); }
+  finally{ clearTimeout(id); }
+}
 async function fetchLive(){
   const key=(loadKey()||$("#akey").value).trim();
   if(!key) throw new Error("NO_KEY");
@@ -758,20 +777,56 @@ async function fetchLive(){
   const opt="?direction=Arrival&withLeg=false&withCancelled=true&withCodeshared=false&withLocation=false";
   const hdr={headers:{"X-RapidAPI-Key":key,"X-RapidAPI-Host":"aerodatabox.p.rapidapi.com"}};
   // Only the rest of today, from ~30 min ago. Chunk into <=12h windows (API cap):
-  // 1 call after ~noon, 2 in the early morning. Keeps calls per page-load minimal.
+  // 1 call after ~noon, 2 in the early morning. Keeps calls per Update minimal.
   const dayStr=ymd(n);
   const hm=m=>pad(Math.floor(m/60))+":"+pad(m%60);
   const fromMin=Math.max(0,(n.getHours()*60+n.getMinutes())-30), endMin=23*60+59;
   const wins=[]; for(let s=fromMin;s<endMin;){ const e=Math.min(endMin,s+12*60-1); wins.push([s,e]); s=e+1; }
   let arrivals=[]; LIVE_QUOTA=null;
   for(const [a,b] of wins){
-    const r=await fetch(base+dayStr+"T"+hm(a)+"/"+dayStr+"T"+hm(b)+opt, hdr);
+    const r=await fetchTimeout(base+dayStr+"T"+hm(a)+"/"+dayStr+"T"+hm(b)+opt, hdr, 15000);
     const rem=r.headers.get("x-ratelimit-requests-remaining"), lim=r.headers.get("x-ratelimit-requests-limit");
     if(rem!=null||lim!=null) LIVE_QUOTA={rem,lim};
     if(!r.ok) throw new Error("HTTP_"+r.status);
     const j=await r.json(); arrivals=arrivals.concat(j.arrivals||[]);
   }
   return arrivals;
+}
+
+/* ---- cache the last good pull (localStorage), so page loads are instant & hit no API ---- */
+function saveCache(){
+  try{ localStorage.setItem("ogg_cache", JSON.stringify({t:liveUpdated,day:ymd(hstNow()),flights:liveFlights,quota:LIVE_QUOTA})); }catch(e){}
+}
+function loadCache(){
+  try{
+    const j=JSON.parse(localStorage.getItem("ogg_cache")||"null");
+    if(j && Array.isArray(j.flights) && j.day===ymd(hstNow())){
+      liveFlights=j.flights; liveActive=true; liveUpdated=j.t||0; LIVE_QUOTA=j.quota||null; LIVE_STATE="ok";
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+/* ---- status UI: the Update button + source note, color-coded by staleness ---- */
+function refreshStatusUI(){
+  const btn=$("#updatebtn"), src=$("#srcnote");
+  if(!btn||!src) return;
+  btn.classList.remove("fresh","aging","stale","none","loading","err");
+  if(LIVE_STATE==="loading"){ btn.classList.add("loading"); btn.textContent="Updating…"; src.className="srcnote"; src.textContent="Fetching live arrivals…"; return; }
+  if(LIVE_STATE==="error"){ btn.classList.add("err"); btn.textContent="Retry"; src.className="srcnote err"; src.textContent="Live feed error — see panel below"; return; }
+  if(liveActive && liveUpdated){
+    const mins=Math.round((Date.now()-liveUpdated)/60000);
+    const lvl=mins<30?"fresh":mins<120?"aging":"stale";
+    const ago=mins<1?"just now":mins<60?mins+"m ago":Math.floor(mins/60)+"h"+(mins%60?" "+(mins%60)+"m":"")+" ago";
+    btn.classList.add(lvl);
+    btn.textContent = lvl==="fresh" ? "Updated "+ago : ago+" · Update";
+    src.className="srcnote live";
+    src.textContent="● LIVE arrivals"+(LIVE_QUOTA&&LIVE_QUOTA.rem!=null?"  ·  ~"+LIVE_QUOTA.rem+" API calls left":"");
+  }else{
+    btn.classList.add("none"); btn.textContent = loadKey()?"Update — go live":"Add key";
+    src.className="srcnote"; src.textContent="Sample timetable — not live data";
+  }
 }
 
 function setLiveState(state, detail){
@@ -781,7 +836,7 @@ function setLiveState(state, detail){
   else if(state==="ok"){ msg.className="livemsg ok"; msg.textContent=detail; }
   else if(state==="error"){ msg.className="livemsg err"; msg.textContent=detail; try{$("#livepanel").open=true;}catch(e){} }
   else { msg.className="livemsg"; msg.textContent=detail||""; }
-  updateLiveChip();
+  updateLiveChip(); refreshStatusUI();
 }
 
 async function goLive(){
@@ -792,7 +847,7 @@ async function goLive(){
   try{
     const arr=await fetchLive();
     liveFlights=parseArrivals(arr);
-    liveActive=true; liveUpdated=Date.now(); setDot(true); SEL=0; buildStrip();
+    liveActive=true; liveUpdated=Date.now(); setDot(true); SEL=0; buildStrip(); saveCache();
     const q = LIVE_QUOTA&&LIVE_QUOTA.rem!=null ? "  ·  ~"+LIVE_QUOTA.rem+(LIVE_QUOTA.lim?"/"+LIVE_QUOTA.lim:"")+" API calls left this month" : "";
     setLiveState("ok", (liveFlights.length
       ? liveFlights.length+" arrivals — today shows real ETAs."
@@ -802,6 +857,7 @@ async function goLive(){
     liveActive=false; setDot(false);
     let m;
     if(e.message==="NO_KEY") m="Paste your key first.";
+    else if(e.name==="AbortError") m="Timed out after 15s — network’s slow or the feed is unreachable. Tap Retry.";
     else if(e.message==="HTTP_401") m="Key rejected (401) — recopy the whole key from RapidAPI.";
     else if(e.message==="HTTP_403") m="403 — your RapidAPI account isn’t subscribed to AeroDataBox’s free plan yet. Subscribe (free, no card), then retry.";
     else if(e.message==="HTTP_429") m="429 — this month’s free quota is used up. It resets next cycle.";
@@ -813,7 +869,7 @@ async function goLive(){
 }
 function clearLive(){
   liveFlights=null; liveActive=false; liveUpdated=0; LIVE_QUOTA=null; setDot(false);
-  $("#akey").value=""; saveKey("");
+  $("#akey").value=""; saveKey(""); try{localStorage.removeItem("ogg_cache");}catch(e){}
   setLiveState("off","Live off — showing the typical timetable.");
   render();
 }
@@ -831,14 +887,15 @@ async function loadData(){
 $("#akey").value=loadKey();
 $("#golive").addEventListener("click",goLive);
 $("#clearlive").addEventListener("click",clearLive);
-$("#livechip").addEventListener("click",()=>{ if(loadKey()||$("#akey").value.trim()) goLive(); else { try{$("#livepanel").open=true; $("#livepanel").scrollIntoView({behavior:"smooth"});}catch(e){} } });
-// Re-pull when you come back to the tab if the data is stale (>15 min). No background timer.
-document.addEventListener("visibilitychange",()=>{ if(!document.hidden && liveActive && (Date.now()-liveUpdated>900000)) goLive(); });
+function requestUpdate(){ if(loadKey()||$("#akey").value.trim()) goLive(); else { try{$("#livepanel").open=true; $("#livepanel").scrollIntoView({behavior:"smooth"});}catch(e){} } }
+$("#updatebtn").addEventListener("click",requestUpdate);
+$("#livechip").addEventListener("click",requestUpdate);
 buildStrip();
+loadCache();              // instant: show the last good pull (today only) — hits no API
 tick();
 render();
 loadData();               // load the cruise schedule from data/cruise.json (falls back to built-in if absent)
-setInterval(tick,30000);  // clock + "Xm ago" only; no API calls
-// Fetch live once on load if a key is saved
-if(loadKey()) goLive();
+setInterval(tick,30000);  // clock + "Xm ago" recolor only; never calls the API
+refreshStatusUI();
+// No fetch on load. Data updates only when you tap Update / the LIVE badge.
 </script>
