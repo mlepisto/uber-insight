@@ -1,14 +1,420 @@
 {
-  "_comment": "Kahului Harbor cruise calls. No free live API exists for this, so keep it current by hand — schedules publish months ahead and rarely change. Recurring visit: arr/dep = {dow, time} (dow 0=Sun..6=Sat). One-off: {date:'YYYY-MM-DD', time}. Times are Hawai'i local (HST).",
+  "_comment": "Auto-scraped from CruiseMapper (Kahului port 782) by scripts/cruise-scrape.mjs. Times are Hawai‘i local. pax = typical double-occupancy where known.",
+  "source": "cruisemapper.com/ports/kahului-port-782",
+  "updated": "2026-09-22T05:40:16.113Z",
   "calls": [
     {
       "ship": "Pride of America",
       "line": "Norwegian",
-      "pax": 2186,
-      "recurring": true,
-      "arr": { "dow": 0, "time": "08:00" },
-      "dep": { "dow": 1, "time": "18:00" },
-      "note": "Weekly interisland loop — overnights in Kahului"
+      "arr": {
+        "date": "2026-09-06",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-09-07",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Silver Whisper",
+      "line": "Silversea Cruises",
+      "arr": {
+        "date": "2026-09-11",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-09-11",
+        "time": "19:00"
+      }
+    },
+    {
+      "ship": "Norwegian Spirit",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-09-12",
+        "time": "09:00"
+      },
+      "dep": {
+        "date": "2026-09-12",
+        "time": "19:00"
+      },
+      "pax": 2018
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-09-13",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-09-14",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Crown Princess",
+      "line": "Princess Cruises",
+      "arr": {
+        "date": "2026-09-17",
+        "time": "07:00"
+      },
+      "dep": {
+        "date": "2026-09-17",
+        "time": "18:00"
+      },
+      "pax": 3080
+    },
+    {
+      "ship": "Norwegian Spirit",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-09-19",
+        "time": "07:00"
+      },
+      "dep": {
+        "date": "2026-09-19",
+        "time": "17:00"
+      },
+      "pax": 2018
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-09-20",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-09-21",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Ruby Princess",
+      "line": "Princess Cruises",
+      "arr": {
+        "date": "2026-09-25",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-09-25",
+        "time": "19:00"
+      },
+      "pax": 3080
+    },
+    {
+      "ship": "ms Noordam",
+      "line": "Holland America",
+      "arr": {
+        "date": "2026-09-26",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-09-26",
+        "time": "20:00"
+      },
+      "pax": 1972
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-09-27",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-09-28",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Carnival Spirit",
+      "line": "Carnival",
+      "arr": {
+        "date": "2026-10-01",
+        "time": "09:00"
+      },
+      "dep": {
+        "date": "2026-10-01",
+        "time": "21:00"
+      }
+    },
+    {
+      "ship": "Oceania Riviera",
+      "line": "Oceania Cruises",
+      "arr": {
+        "date": "2026-10-03",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-10-03",
+        "time": "19:00"
+      }
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-10-04",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-10-05",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Emerald Princess",
+      "line": "Princess Cruises",
+      "arr": {
+        "date": "2026-10-09",
+        "time": "09:00"
+      },
+      "dep": {
+        "date": "2026-10-09",
+        "time": "18:00"
+      },
+      "pax": 3080
+    },
+    {
+      "ship": "ms Koningsdam",
+      "line": "Holland America",
+      "arr": {
+        "date": "2026-10-10",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-10-10",
+        "time": "19:00"
+      },
+      "pax": 2650
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-10-11",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-10-12",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Carnival Radiance",
+      "line": "Carnival",
+      "arr": {
+        "date": "2026-10-16",
+        "time": "10:00"
+      },
+      "dep": {
+        "date": "2026-10-16",
+        "time": "21:00"
+      },
+      "pax": 2984
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-10-18",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-10-19",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Emerald Princess",
+      "line": "Princess Cruises",
+      "arr": {
+        "date": "2026-10-23",
+        "time": "07:00"
+      },
+      "dep": {
+        "date": "2026-10-23",
+        "time": "18:00"
+      },
+      "pax": 3080
+    },
+    {
+      "ship": "ms Zaandam",
+      "line": "Holland America",
+      "arr": {
+        "date": "2026-10-24",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-10-24",
+        "time": "17:00"
+      },
+      "pax": 1432
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-10-25",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-10-26",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Ruby Princess",
+      "line": "Princess Cruises",
+      "arr": {
+        "date": "2026-10-29",
+        "time": "07:00"
+      },
+      "dep": {
+        "date": "2026-10-29",
+        "time": "18:00"
+      },
+      "pax": 3080
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-11-01",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-11-02",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-11-08",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-11-09",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Carnival Radiance",
+      "line": "Carnival",
+      "arr": {
+        "date": "2026-11-13",
+        "time": "10:00"
+      },
+      "dep": {
+        "date": "2026-11-13",
+        "time": "21:00"
+      },
+      "pax": 2984
+    },
+    {
+      "ship": "Ruby Princess",
+      "line": "Princess Cruises",
+      "arr": {
+        "date": "2026-11-14",
+        "time": "07:00"
+      },
+      "dep": {
+        "date": "2026-11-14",
+        "time": "18:00"
+      },
+      "pax": 3080
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-11-15",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-11-16",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-11-22",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-11-23",
+        "time": "18:00"
+      },
+      "pax": 2186
+    },
+    {
+      "ship": "Crown Princess",
+      "line": "Princess Cruises",
+      "arr": {
+        "date": "2026-11-26",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-11-26",
+        "time": "19:00"
+      },
+      "pax": 3080
+    },
+    {
+      "ship": "ms Zaandam",
+      "line": "Holland America",
+      "arr": {
+        "date": "2026-11-27",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-11-27",
+        "time": "17:00"
+      },
+      "pax": 1432
+    },
+    {
+      "ship": "Sapphire Princess",
+      "line": "Princess Cruises",
+      "arr": {
+        "date": "2026-11-28",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-11-28",
+        "time": "19:00"
+      },
+      "pax": 2670
+    },
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "arr": {
+        "date": "2026-11-29",
+        "time": "08:00"
+      },
+      "dep": {
+        "date": "2026-11-30",
+        "time": "18:00"
+      },
+      "pax": 2186
     }
   ]
 }
