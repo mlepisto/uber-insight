@@ -118,9 +118,19 @@
     border-left-width:4px;border-radius:12px;padding:12px 14px;margin-top:14px}
   .cruise .ic{flex:0 0 auto;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:13px;letter-spacing:.06em;
     color:var(--teal);text-transform:uppercase;padding-top:1px}
-  .cruise .body{font-size:13px}
-  .cruise .body b{font-size:15px;font-family:"Barlow Condensed",sans-serif;letter-spacing:.02em;font-weight:700}
+  .cruise .body{font-size:13px;flex:1;min-width:0}
+  .cruise .body b{font-size:16px;font-family:"Barlow Condensed",sans-serif;letter-spacing:.02em;font-weight:700}
+  .cruise .chead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .cruise .ctag{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--teal);border:1px solid var(--teal);border-radius:6px;padding:1px 7px}
   .cruise .meta{color:var(--muted);margin-top:2px}
+  .cruise .cwins{margin-top:9px;display:flex;flex-direction:column;gap:6px}
+  .cwin{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 9px}
+  .cwin .cwdir{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:12px;letter-spacing:.03em;color:var(--ink);white-space:nowrap}
+  .cwin.pickup .cwdir{color:var(--accent)} .cwin.return .cwdir{color:var(--amber)}
+  .cwin .cwlab{font-size:12px;color:var(--muted);min-width:0}
+  .cwin .cwtime{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:14px;white-space:nowrap;color:var(--ink)}
+  .cruise .cnote{font-size:11.5px;color:var(--faint);margin-top:7px;line-height:1.5}
+  @media (max-width:440px){.cwin{grid-template-columns:1fr auto}.cwin .cwlab{grid-column:1/-1;order:3}}
 
   /* ---- section label ---- */
   .seclab{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:26px 4px 10px}
@@ -335,16 +345,23 @@ const WKND = [
   ["21:10","DL621","DL","LAX","A332"]
 ];
 
-// Cruise: recurring weekly rule + explicit flagged examples (verify against Kahului Harbor schedule).
-// dow: 0=Sun..6=Sat. Pride of America overnights in Kahului on its 7-night interisland loop.
-const CRUISE_WEEKLY = [
-  {dow:1,ship:"Pride of America",line:"Norwegian",pax:2186,inn:"08:00",out:null,overnight:true,note:"overnights — passengers ashore all day & evening"},
-  {dow:2,ship:"Pride of America",line:"Norwegian",pax:2186,inn:null,out:"18:00",overnight:false,note:"sails ~6pm — back-to-port rush late afternoon"}
+// Cruise calls at Kahului Harbor. Each visit has an ARRIVAL and a DEPARTURE —
+// those two clock events, not "in port", are what drive rides:
+//   • after arrival: passengers head OGG-ward to grab rental cars  (harbor → airport)
+//   • before departure: they return rentals & race back to the ship (airport → harbor)
+// Recurring visit: arr/dep = {dow, time}  (dow 0=Sun..6=Sat). One-off: {date:"YYYY-MM-DD", time}.
+// TIMES ARE A TEMPLATE — verify against the Kahului Harbor / Maui cruise schedule.
+const CRUISE_CALLS = [
+  { ship:"Pride of America", line:"Norwegian", pax:2186, recurring:true,
+    arr:{dow:1, time:"08:00"}, dep:{dow:2, time:"18:00"},
+    note:"Weekly interisland loop — overnights in Kahului" }
+  // One-off example — copy this shape, drop in real calls:
+  // ,{ ship:"Grand Princess", line:"Princess", pax:2600,
+  //    arr:{date:"2026-09-24", time:"07:00"}, dep:{date:"2026-09-24", time:"17:00"}, note:"Day call (tender)" }
 ];
-// Extra dated calls (YYYY-MM-DD). Examples, clearly flagged.
-const CRUISE_DATED = {
-  // e.g. "2026-09-24":[{ship:"Grand Princess",line:"Princess",pax:2600,inn:"07:00",out:"17:00",note:"tender port day"}]
-};
+// Airport rental-car flow between Kahului Harbor and OGG (~10 min apart), minutes offsets:
+const PICKUP_AFTER  = [45,165];   // min after arrival  → harbor→airport rental-pickup window
+const RETURN_BEFORE = [210,60];   // min before departure → airport→harbor return window (all-aboard ≈ dep−60)
 
 /* ============================ ENGINE ============================ */
 const $ = s=>document.querySelector(s);
@@ -409,11 +426,47 @@ function seatFromModel(m){
   return {s,wb,name};
 }
 
+// day-ordinal helpers (UTC-based integer day number)
+function ord(d){return Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000);}
+function ordFromStr(s){const[y,m,dd]=s.split("-").map(Number);return Math.floor(Date.UTC(y,m-1,dd)/86400000);}
+function dowOfOrd(o){return new Date(o*86400000).getUTCDay();}
+function clampMin(m){return Math.max(0,Math.min(1439,m));}
+
+// Resolve a call's concrete arrival/departure ordinals bracketing display date d.
+function resolveCall(c,dOrd,dDow){
+  let arrOrd,depOrd;
+  if(c.recurring){
+    arrOrd = dOrd - ((dDow - c.arr.dow + 7)%7);        // most recent arrival dow on/before d
+    depOrd = arrOrd + ((c.dep.dow - c.arr.dow + 7)%7); // next departure dow after arrival
+  }else{
+    arrOrd = ordFromStr(c.arr.date); depOrd = ordFromStr(c.dep.date);
+  }
+  return {arrOrd,depOrd,arrMin:toMin(c.arr.time),depMin:toMin(c.dep.time)};
+}
+
 function cruiseForDate(d){
-  const out=[];
-  const key=ymd(d);
-  CRUISE_WEEKLY.filter(c=>c.dow===d.getDay()).forEach(c=>out.push(c));
-  (CRUISE_DATED[key]||[]).forEach(c=>out.push(c));
+  const out=[]; const dOrd=ord(d), dDow=d.getDay();
+  CRUISE_CALLS.forEach(c=>{
+    const r=resolveCall(c,dOrd,dDow);
+    if(dOrd<r.arrOrd || dOrd>r.depOrd) return;       // ship not in port on this date
+    const isArr=dOrd===r.arrOrd, isDep=dOrd===r.depOrd;
+    const totalH=Math.round(((r.depOrd-r.arrOrd)*1440 + r.depMin - r.arrMin)/60);
+    const windows=[];
+    if(isArr) windows.push({dir:"Harbor → OGG", kind:"pickup",
+      a:clampMin(r.arrMin+PICKUP_AFTER[0]), b:clampMin(r.arrMin+PICKUP_AFTER[1]),
+      label:"Rental-car pickup rush"});
+    if(isDep) windows.push({dir:"OGG → Harbor", kind:"return",
+      a:clampMin(r.depMin-RETURN_BEFORE[0]), b:clampMin(r.depMin-RETURN_BEFORE[1]),
+      label:"Rental returns · back to ship"});
+    out.push({
+      ship:c.ship,line:c.line,pax:c.pax,note:c.note||"",
+      isArr,isDep,sameDay:r.arrOrd===r.depOrd,totalH,
+      arrDow:DOW[dowOfOrd(r.arrOrd)],depDow:DOW[dowOfOrd(r.depOrd)],
+      arrTxt:to12(c.arr.time),depTxt:to12(c.dep.time),
+      allAboard:to12hm(clampMin(r.depMin-60)),
+      windows
+    });
+  });
   return out;
 }
 
@@ -482,11 +535,26 @@ function render(){
   const ch = $("#cruisehost"); ch.innerHTML="";
   cruises.forEach(c=>{
     const div=document.createElement("div");div.className="cruise";
-    const when = c.overnight ? "In port from "+to12(c.inn)+" — overnight"
-      : c.inn && c.out ? "In port "+to12(c.inn)+"–"+to12(c.out)
-      : c.out ? "Departs "+to12(c.out) : "In port";
-    div.innerHTML='<div class="ic">Cruise</div><div class="body"><b>'+c.ship+'</b> · '+c.line+
-      ' · ~'+c.pax.toLocaleString()+' pax<div class="meta">'+when+' — '+c.note+'</div></div>';
+    // in-port line: arrival → departure, with day names when overnight, plus hours
+    let span;
+    if(c.sameDay) span="In port "+c.arrTxt+"–"+c.depTxt+" · "+c.totalH+"h";
+    else span="In port "+c.arrDow+" "+c.arrTxt+" → "+c.depDow+" "+c.depTxt+" · "+c.totalH+"h";
+    // today's status tag
+    let tag = c.isArr&&c.isDep ? "Day call" : c.isArr ? "Arrives today" : c.isDep ? "Sails today" : "Ashore all day";
+    let win="";
+    c.windows.forEach(w=>{
+      win+='<div class="cwin '+w.kind+'"><span class="cwdir">'+w.dir+'</span>'+
+        '<span class="cwlab">'+w.label+'</span><span class="cwtime tnum">'+to12hm(w.a)+"–"+to12hm(w.b)+'</span></div>';
+    });
+    if(!c.windows.length){ // mid-visit overnight day: no arr/dep event today
+      win='<div class="cwin"><span class="cwdir">Harbor ↔ town</span><span class="cwlab">Steady all-day demand — no arrival/sail today</span></div>';
+    }
+    if(c.isDep) win+='<div class="cnote">All-aboard ≈ '+c.allAboard+' — the return rush ends before that, not at sail time.</div>';
+    div.innerHTML='<div class="ic">Cruise</div><div class="body">'+
+      '<div class="chead"><b>'+c.ship+'</b> <span class="ctag">'+tag+'</span></div>'+
+      '<div class="meta">'+c.line+' · ~'+c.pax.toLocaleString()+' pax · '+span+'</div>'+
+      '<div class="cwins">'+win+'</div>'+
+      (c.note?'<div class="cnote">'+c.note+' — verify times.</div>':'')+'</div>';
     ch.appendChild(div);
   });
 
@@ -599,6 +667,7 @@ function render(){
   }
 }
 function to12(t){if(!t)return"";const[h,m]=t.split(":").map(Number);const ap=h>=12?"pm":"am";return(((h+11)%12)+1)+":"+pad(m)+ap;}
+function to12hm(min){const h=Math.floor(min/60),m=min%60,ap=h>=12?"pm":"am";return(((h+11)%12)+1)+":"+pad(m)+ap;}
 
 /* ---- day strip ---- */
 function buildStrip(){
