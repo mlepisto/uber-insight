@@ -338,9 +338,10 @@
   </section>
 
   <details class="live" id="livepanel">
-    <summary><span>Live status &amp; ETAs <span style="font-weight:400;color:var(--faint)">— real delays</span></span><span class="livedot" id="livedot"></span></summary>
+    <summary><span>Live delays <span style="font-weight:400;color:var(--faint)">— optional, needs a free key</span></span><span class="livedot" id="livedot"></span></summary>
     <div class="livebody">
-      <p>Your browser pulls arrivals <b>live, straight from the source</b> — no server. Today switches to the real feed: actual flight numbers, delays (ON TIME / LATE / LANDED), late flights re-bucketed into the window they really land in.</p>
+      <p><b>You don’t need this.</b> The whole board already runs on the schedule the daily job publishes — no key. This only adds <b>to-the-minute delays for today</b> (a flight going late or cancelling after the morning pull), fetched in your browser.</p>
+      <p>With a key, tapping Update also pulls actual flight numbers and delays (ON TIME / LATE / LANDED) and re-buckets late flights into the window they really land in.</p>
       <p><b>Updates only when you tap Update</b> (or the LIVE badge). Page loads use the cached copy — no API call. One call per Update in the afternoon/evening, two in the early morning.</p>
       <p><b>Usage:</b> the browser can’t read the quota counter (the feed hides it from in-page scripts), so check units used on your <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">RapidAPI dashboard → Analytics</a>.</p>
       <p><b>Setup once (free, no card, ~2 min):</b> make a <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">RapidAPI account</a>, subscribe to AeroDataBox's <b>Basic (free)</b> plan, copy the key, paste it below. Saved on this device only.</p>
@@ -1035,7 +1036,12 @@ async function loadData(){
 $("#akey").value=loadKey();
 $("#golive").addEventListener("click",goLive);
 $("#clearlive").addEventListener("click",clearLive);
-function requestUpdate(){ if(loadKey()||$("#akey").value.trim()) goLive(); else { try{$("#livepanel").open=true; $("#livepanel").scrollIntoView({behavior:"smooth"});}catch(e){} } }
+function requestUpdate(){
+  if(loadKey()||$("#akey").value.trim()){ goLive(); return; }
+  // No key: just re-pull the auto feed the GitHub Action commits (no key needed).
+  setLiveState("loading");
+  loadData().then(()=>{ setLiveState(SCHED?"ok":"off"); if(SCHED){ const src=$("#srcnote"); if(src){ src.className="srcinline live"; src.textContent=" · refreshed from auto feed"; setTimeout(refreshStatusUI,1600);} } });
+}
 $("#updatebtn").addEventListener("click",requestUpdate);
 buildStrip();
 loadCache();              // instant: show the last good pull (today only) — hits no API
