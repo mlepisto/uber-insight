@@ -904,7 +904,6 @@ $("#golive").addEventListener("click",goLive);
 $("#clearlive").addEventListener("click",clearLive);
 function requestUpdate(){ if(loadKey()||$("#akey").value.trim()) goLive(); else { try{$("#livepanel").open=true; $("#livepanel").scrollIntoView({behavior:"smooth"});}catch(e){} } }
 $("#updatebtn").addEventListener("click",requestUpdate);
-$("#livechip").addEventListener("click",requestUpdate);
 buildStrip();
 loadCache();              // instant: show the last good pull (today only) — hits no API
 tick();
