@@ -128,6 +128,7 @@
   .cwin .cwdir{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:12px;letter-spacing:.03em;color:var(--ink);white-space:nowrap}
   .cwin.pickup .cwdir{color:var(--accent)} .cwin.return .cwdir{color:var(--amber)}
   .cwin .cwlab{font-size:12px;color:var(--muted);min-width:0}
+  .cwin .cwlab b{color:var(--ink);font-weight:700}
   .cwin .cwtime{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:14px;white-space:nowrap;color:var(--ink)}
   .cruise .cnote{font-size:11.5px;color:var(--faint);margin-top:7px;line-height:1.5}
   @media (max-width:440px){.cwin{grid-template-columns:1fr auto}.cwin .cwlab{grid-column:1/-1;order:3}}
@@ -452,12 +453,12 @@ function cruiseForDate(d){
     const isArr=dOrd===r.arrOrd, isDep=dOrd===r.depOrd;
     const totalH=Math.round(((r.depOrd-r.arrOrd)*1440 + r.depMin - r.arrMin)/60);
     const windows=[];
-    if(isArr) windows.push({dir:"Harbor → OGG", kind:"pickup",
+    if(isArr) windows.push({dir:"Harbor → rental lot", kind:"pickup", stage:"Stage at the harbor",
       a:clampMin(r.arrMin+PICKUP_AFTER[0]), b:clampMin(r.arrMin+PICKUP_AFTER[1]),
-      label:"Rental-car pickup rush"});
-    if(isDep) windows.push({dir:"OGG → Harbor", kind:"return",
+      label:"Riders heading to OGG to pick up rental cars"});
+    if(isDep) windows.push({dir:"Rental lot → Harbor", kind:"return", stage:"Stage at the OGG rental return",
       a:clampMin(r.depMin-RETURN_BEFORE[0]), b:clampMin(r.depMin-RETURN_BEFORE[1]),
-      label:"Rental returns · back to ship"});
+      label:"Cars dropped back at the lot — riders racing to the ship"});
     out.push({
       ship:c.ship,line:c.line,pax:c.pax,note:c.note||"",
       isArr,isDep,sameDay:r.arrOrd===r.depOrd,totalH,
@@ -544,11 +545,13 @@ function render(){
     let win="";
     c.windows.forEach(w=>{
       win+='<div class="cwin '+w.kind+'"><span class="cwdir">'+w.dir+'</span>'+
-        '<span class="cwlab">'+w.label+'</span><span class="cwtime tnum">'+to12hm(w.a)+"–"+to12hm(w.b)+'</span></div>';
+        '<span class="cwlab"><b>'+w.stage+'</b> · '+w.label+'</span>'+
+        '<span class="cwtime tnum">'+to12hm(w.a)+"–"+to12hm(w.b)+'</span></div>';
     });
     if(!c.windows.length){ // mid-visit overnight day: no arr/dep event today
       win='<div class="cwin"><span class="cwdir">Harbor ↔ town</span><span class="cwlab">Steady all-day demand — no arrival/sail today</span></div>';
     }
+    if(c.windows.length) win+='<div class="cnote">Anchor is the OGG rental-car lot — cars must be returned where they were picked up, so that lot is your stage point, not the passenger terminal.</div>';
     if(c.isDep) win+='<div class="cnote">All-aboard ≈ '+c.allAboard+' — the return rush ends before that, not at sail time.</div>';
     div.innerHTML='<div class="ic">Cruise</div><div class="body">'+
       '<div class="chead"><b>'+c.ship+'</b> <span class="ctag">'+tag+'</span></div>'+
