@@ -353,7 +353,7 @@ const WKND = [
 // TIMES ARE A TEMPLATE — verify against the Kahului Harbor / Maui cruise schedule.
 const CRUISE_CALLS = [
   { ship:"Pride of America", line:"Norwegian", pax:2186, recurring:true,
-    arr:{dow:1, time:"08:00"}, dep:{dow:2, time:"18:00"},
+    arr:{dow:0, time:"08:00"}, dep:{dow:1, time:"18:00"},   // Sun arrive → Mon depart (overnight). CONFIRM days/times.
     note:"Weekly interisland loop — overnights in Kahului" }
   // One-off example — copy this shape, drop in real calls:
   // ,{ ship:"Grand Princess", line:"Princess", pax:2600,
