@@ -388,11 +388,6 @@ function weight(o){
 }
 
 function flightsForDate(d){
-  const key = ymd(d);
-  // Prefer the auto-refreshed real feed for the day it covers (today).
-  if(REAL && REAL.day===key && REAL.flights && REAL.flights.length){
-    return REAL.flights.slice().sort((a,b)=>a.effMin-b.effMin);
-  }
   const dow = d.getDay();
   const weekend = (dow===0||dow===5||dow===6);
   let list = INTER.concat(MAIN);
@@ -519,13 +514,6 @@ let liveFlights=null;   // real arrivals array when browser "Go live" is on (tod
 let liveActive=false;
 let liveUpdated=0;      // epoch ms of last successful browser fetch
 let autoTimer=null;
-let REAL=null;          // auto-refreshed data/flights.json (real today's arrivals)
-let REAL_UPDATED=0;     // epoch ms parsed from REAL.updated
-
-// Is the committed data file real, current, and for today?
-function realToday(){
-  return REAL && REAL.flights && REAL.flights.length && REAL.day===ymd(hstNow());
-}
 
 function render(){
   const now = hstNow();
@@ -638,7 +626,7 @@ function render(){
     });
     // worst live status for the block meta line
     let blockBadge="";
-    if((liveActive||realToday()) && isToday){
+    if(liveActive && isToday){
       const late=b.fl.filter(f=>f.delayMin>=15&&!f.landed&&!f.cancelled);
       const cxl=b.fl.filter(f=>f.cancelled).length;
       if(late.length) blockBadge='<span class="fst '+(late.some(f=>f.delayMin>=45)?'verylate':'late')+'">'+late.length+' late</span>';
@@ -701,10 +689,6 @@ function updateLiveChip(){
     c.classList.remove("off");
     const ago=liveUpdated?Math.max(0,Math.round((Date.now()-liveUpdated)/60000)):0;
     t.textContent="Live · "+(ago<1?"now":ago+"m ago");
-  }else if(realToday()){
-    c.classList.remove("off");
-    const ago=REAL_UPDATED?Math.max(0,Math.round((Date.now()-REAL_UPDATED)/60000)):0;
-    t.textContent="Auto · "+(ago<1?"now":ago+"m ago");
   }else{ c.classList.add("off"); t.textContent="Schedule"; }
 }
 function tick(){
@@ -804,15 +788,11 @@ function clearLive(){
 function startAuto(){ stopAuto(); autoTimer=setInterval(()=>{ if(!document.hidden) goLive(true); },180000); }
 function stopAuto(){ if(autoTimer){clearInterval(autoTimer);autoTimer=null;} }
 
-/* ---- load committed data files (auto-refreshed by GitHub Actions) ---- */
+/* ---- load the editable cruise schedule (data/cruise.json) ---- */
 async function loadData(){
   try{
     const r=await fetch("./data/cruise.json",{cache:"no-store"});
     if(r.ok){ const j=await r.json(); if(Array.isArray(j.calls)){ CRUISE_CALLS.length=0; j.calls.forEach(c=>CRUISE_CALLS.push(c)); } }
-  }catch(e){}
-  try{
-    const r=await fetch("./data/flights.json",{cache:"no-store"});
-    if(r.ok){ const j=await r.json(); if(j&&j.flights){ REAL=j; REAL_UPDATED=Date.parse(j.updated||"")||0; } }
   }catch(e){}
   buildStrip(); updateLiveChip(); render();
 }
@@ -827,9 +807,8 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden && liveAc
 buildStrip();
 tick();
 render();
-loadData();               // pull auto-refreshed cruise + flight data (Pages); no-op on the artifact preview
+loadData();               // load the cruise schedule from data/cruise.json (falls back to built-in if absent)
 setInterval(tick,30000);
-setInterval(loadData,300000); // re-read the committed data every 5 min so the page tracks the Action's refreshes
-// auto-start browser live if a key is already saved (instant, to-the-minute)
+// auto-start the live client-side feed if a key is already saved
 if(loadKey()){ goLive(true); }
 </script>
