@@ -792,12 +792,23 @@ async function fetchLive(){
   let arrivals=[]; LIVE_QUOTA=null;
   for(const [a,b] of wins){
     const r=await fetchTimeout(base+dayStr+"T"+hm(a)+"/"+dayStr+"T"+hm(b)+opt, hdr, 15000);
-    const rem=r.headers.get("x-ratelimit-requests-remaining"), lim=r.headers.get("x-ratelimit-requests-limit");
-    if(rem!=null||lim!=null) LIVE_QUOTA={rem,lim};
+    const q=readQuota(r); if(q) LIVE_QUOTA=q;   // last window's headers are freshest
     if(!r.ok) throw new Error("HTTP_"+r.status);
     const j=await r.json(); arrivals=arrivals.concat(j.arrivals||[]);
   }
   return arrivals;
+}
+// Capture every rate-limit counter the feed exposes (requests AND API units, if CORS lets us read them).
+function readQuota(r){
+  const q={};
+  try{ r.headers.forEach((v,k)=>{ k=k.toLowerCase();
+    if(k.startsWith("x-ratelimit-") && k.endsWith("-remaining")){ q[k.slice(12,-10)]=v; } }); }catch(e){}
+  return Object.keys(q).length?q:null;
+}
+function quotaText(){
+  if(!LIVE_QUOTA) return "";
+  const p=Object.entries(LIVE_QUOTA).map(([k,v])=>v+" "+k);
+  return p.length ? "  ·  "+p.join(" / ")+" left" : "";
 }
 
 /* ---- cache the last good pull (localStorage), so page loads are instant & hit no API ---- */
@@ -829,7 +840,7 @@ function refreshStatusUI(){
     const ago=mins<1?"just now":mins<60?mins+"m ago":Math.floor(mins/60)+"h ago";
     btn.classList.add(lvl);
     src.className="srcnote live";
-    src.textContent="● LIVE · "+fmtClockHST(liveUpdated)+" ("+ago+")"+(LIVE_QUOTA&&LIVE_QUOTA.rem!=null?"  ·  ~"+LIVE_QUOTA.rem+" calls left":"");
+    src.textContent="● LIVE · "+fmtClockHST(liveUpdated)+" ("+ago+")"+quotaText();
   }else{
     btn.classList.add("none");
     src.className="srcnote"; src.textContent="Sample timetable — not live data";
@@ -855,7 +866,7 @@ async function goLive(){
     const arr=await fetchLive();
     liveFlights=parseArrivals(arr);
     liveActive=true; liveUpdated=Date.now(); setDot(true); SEL=0; buildStrip(); saveCache();
-    const q = LIVE_QUOTA&&LIVE_QUOTA.rem!=null ? "  ·  ~"+LIVE_QUOTA.rem+(LIVE_QUOTA.lim?"/"+LIVE_QUOTA.lim:"")+" API calls left this month" : "";
+    const q = quotaText();
     setLiveState("ok", (liveFlights.length
       ? liveFlights.length+" arrivals — today shows real ETAs."
       : "Feed reached, but 0 arrivals in the window. Odd for OGG — check the date/subscription.")+q);
