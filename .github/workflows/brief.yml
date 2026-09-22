@@ -33,6 +33,7 @@ jobs:
 
       - name: Commit refreshed schedule
         run: |
+          if [ ! -f data/flights.json ]; then echo "no flights.json (no key yet) — skipping commit"; exit 0; fi
           git config user.name "ogg-flights-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/flights.json
