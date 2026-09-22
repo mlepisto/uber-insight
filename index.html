@@ -453,12 +453,10 @@ function cruiseForDate(d){
     const isArr=dOrd===r.arrOrd, isDep=dOrd===r.depOrd;
     const totalH=Math.round(((r.depOrd-r.arrOrd)*1440 + r.depMin - r.arrMin)/60);
     const windows=[];
-    if(isArr) windows.push({dir:"Harbor → rental lot", kind:"pickup", stage:"Stage at the harbor",
-      a:clampMin(r.arrMin+PICKUP_AFTER[0]), b:clampMin(r.arrMin+PICKUP_AFTER[1]),
-      label:"Riders heading to OGG to pick up rental cars"});
-    if(isDep) windows.push({dir:"Rental lot → Harbor", kind:"return", stage:"Stage at the OGG rental return",
-      a:clampMin(r.depMin-RETURN_BEFORE[0]), b:clampMin(r.depMin-RETURN_BEFORE[1]),
-      label:"Cars dropped back at the lot — riders racing to the ship"});
+    if(isArr) windows.push({dir:"Ship → rental & town", kind:"pickup", stage:"Stage at the harbor",
+      a:clampMin(r.arrMin+PICKUP_AFTER[0]), b:clampMin(r.arrMin+PICKUP_AFTER[1])});
+    if(isDep) windows.push({dir:"Rental & town → ship", kind:"return", stage:"Stage in town / at rentals",
+      a:clampMin(r.depMin-RETURN_BEFORE[0]), b:clampMin(r.depMin-RETURN_BEFORE[1])});
     out.push({
       ship:c.ship,line:c.line,pax:c.pax,note:c.note||"",
       isArr,isDep,sameDay:r.arrOrd===r.depOrd,totalH,
@@ -545,19 +543,16 @@ function render(){
     let win="";
     c.windows.forEach(w=>{
       win+='<div class="cwin '+w.kind+'"><span class="cwdir">'+w.dir+'</span>'+
-        '<span class="cwlab"><b>'+w.stage+'</b> · '+w.label+'</span>'+
+        '<span class="cwlab"><b>'+w.stage+'</b></span>'+
         '<span class="cwtime tnum">'+to12hm(w.a)+"–"+to12hm(w.b)+'</span></div>';
     });
     if(!c.windows.length){ // mid-visit overnight day: no arr/dep event today
-      win='<div class="cwin"><span class="cwdir">Harbor ↔ town</span><span class="cwlab">Steady all-day demand — no arrival/sail today</span></div>';
+      win='<div class="cwin"><span class="cwdir">In port</span><span class="cwlab"><b>Steady demand all day</b></span></div>';
     }
-    if(c.windows.length) win+='<div class="cnote">Anchor is the OGG rental-car lot — cars must be returned where they were picked up, so that lot is your stage point, not the passenger terminal.</div>';
-    if(c.isDep) win+='<div class="cnote">All-aboard ≈ '+c.allAboard+' — the return rush ends before that, not at sail time.</div>';
     div.innerHTML='<div class="ic">Cruise</div><div class="body">'+
       '<div class="chead"><b>'+c.ship+'</b> <span class="ctag">'+tag+'</span></div>'+
       '<div class="meta">'+c.line+' · ~'+c.pax.toLocaleString()+' pax · '+span+'</div>'+
-      '<div class="cwins">'+win+'</div>'+
-      (c.note?'<div class="cnote">'+c.note+' — verify times.</div>':'')+'</div>';
+      '<div class="cwins">'+win+'</div></div>';
     ch.appendChild(div);
   });
 
