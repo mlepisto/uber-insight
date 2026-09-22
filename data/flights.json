@@ -1,0 +1,7 @@
+{
+  "airport": "OGG",
+  "updated": null,
+  "day": null,
+  "flights": [],
+  "_comment": "Auto-written by scripts/refresh.mjs via GitHub Actions once an AERODATABOX_KEY secret is set. Until then this is empty and the board falls back to its built-in typical timetable."
+}

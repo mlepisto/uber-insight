@@ -1,0 +1,14 @@
+{
+  "_comment": "Kahului Harbor cruise calls. No free live API exists for this, so keep it current by hand — schedules publish months ahead and rarely change. Recurring visit: arr/dep = {dow, time} (dow 0=Sun..6=Sat). One-off: {date:'YYYY-MM-DD', time}. Times are Hawai'i local (HST).",
+  "calls": [
+    {
+      "ship": "Pride of America",
+      "line": "Norwegian",
+      "pax": 2186,
+      "recurring": true,
+      "arr": { "dow": 0, "time": "08:00" },
+      "dep": { "dow": 1, "time": "18:00" },
+      "note": "Weekly interisland loop — overnights in Kahului"
+    }
+  ]
+}
