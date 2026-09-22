@@ -730,9 +730,12 @@ function loadKey(){try{return localStorage.getItem("ogg_adb_key")||"";}catch(e){
 function saveKey(k){try{k?localStorage.setItem("ogg_adb_key",k):localStorage.removeItem("ogg_adb_key");}catch(e){}}
 function setDot(on){$("#livedot").classList.toggle("on",on);}
 
+const CARGO_RE=/fedex|ups|united parcel|cargo|freight|atlas air|kalitta|abx|cargolux|dhl|amerijet|ameriflight/i;
 function parseArrivals(arr){
   const out=[];
   arr.forEach(f=>{
+    if(f.isCargo===true) return;                                   // API cargo flag
+    if(CARGO_RE.test((f.airline&&f.airline.name)||"")) return;     // backup: known freight carriers
     const mv=f.movement||f.arrival||{};
     const sched=mv.scheduledTime&&(mv.scheduledTime.local||"");
     const revT=mv.revisedTime&&(mv.revisedTime.local||"");
@@ -777,7 +780,8 @@ async function fetchLive(){
   if(!key) throw new Error("NO_KEY");
   const n=hstNow();
   const base="https://aerodatabox.p.rapidapi.com/flights/airports/icao/PHOG/";
-  const opt="?direction=Arrival&withLeg=false&withCancelled=true&withCodeshared=false&withLocation=false";
+  // withCargo=false / withPrivate=false → drop freighters (UPS, FedEx…) and private jets; passengers only.
+  const opt="?direction=Arrival&withLeg=false&withCancelled=true&withCodeshared=false&withCargo=false&withPrivate=false&withLocation=false";
   const hdr={headers:{"X-RapidAPI-Key":key,"X-RapidAPI-Host":"aerodatabox.p.rapidapi.com"}};
   // Only the rest of today, from ~30 min ago. Chunk into <=12h windows (API cap):
   // 1 call after ~noon, 2 in the early morning. Keeps calls per Update minimal.
