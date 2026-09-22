@@ -250,7 +250,7 @@
   <section class="now" id="nowcard" aria-live="polite">
     <div class="now-head">
       <span class="nh-l"><span class="pulse" id="nowpulse"></span> <span id="nowlabel">Right now at OGG</span></span>
-      <span class="nh-r"><span class="updtime" id="updtime"></span><button class="upd none" id="updatebtn" type="button">Update</button></span>
+      <button class="upd none" id="updatebtn" type="button">Update</button>
     </div>
     <div class="srcnote" id="srcnote">Sample timetable — not live data</div>
     <div class="now-grid">
@@ -260,7 +260,7 @@
         <div class="sub" id="nowflights">no arrivals</div>
       </div>
       <div class="stat">
-        <div class="k">Landing next 90 min</div>
+        <div class="k">Landing next 60 min</div>
         <div class="v tnum"><span id="soonseats">0</span> <small>seats</small></div>
         <div class="sub" id="soonflights">across 0 flights</div>
       </div>
@@ -588,7 +588,7 @@ function render(){
     $("#nowseats").textContent = cur?cur.seats:0;
     $("#nowflights").textContent = cur&&cur.fl.length? cur.fl.length+" flight"+(cur.fl.length>1?"s":"")+" landing" : "no arrivals this block";
     // next 90 min
-    const soon = flights.filter(f=>!f.cancelled && f.effMin>=nowMin && f.effMin<nowMin+90);
+    const soon = flights.filter(f=>!f.cancelled && f.effMin>=nowMin && f.effMin<nowMin+60);
     $("#soonseats").textContent = soon.reduce((s,f)=>s+f.seats,0);
     $("#soonflights").textContent = "across "+soon.length+" flight"+(soon.length!==1?"s":"");
   }else{
@@ -817,22 +817,21 @@ function loadCache(){
 
 /* ---- status UI: the Update button + source note, color-coded by staleness ---- */
 function refreshStatusUI(){
-  const btn=$("#updatebtn"), src=$("#srcnote"), ut=$("#updtime");
+  const btn=$("#updatebtn"), src=$("#srcnote");
   if(!btn||!src) return;
-  if(ut) ut.textContent = liveUpdated ? "updated "+fmtClockHST(liveUpdated) : "";
   btn.classList.remove("fresh","aging","stale","none","loading","err");
   if(LIVE_STATE==="loading"){ btn.classList.add("loading"); btn.textContent="Updating…"; src.className="srcnote"; src.textContent="Fetching live arrivals…"; return; }
   if(LIVE_STATE==="error"){ btn.classList.add("err"); btn.textContent="Retry"; src.className="srcnote err"; src.textContent="Live feed error — see panel below"; return; }
+  btn.textContent="Update";
   if(liveActive && liveUpdated){
     const mins=Math.round((Date.now()-liveUpdated)/60000);
     const lvl=mins<30?"fresh":mins<120?"aging":"stale";
+    const ago=mins<1?"just now":mins<60?mins+"m ago":Math.floor(mins/60)+"h ago";
     btn.classList.add(lvl);
-    btn.textContent="Update";
-    if(ut) ut.textContent = "updated "+fmtClockHST(liveUpdated)+" · "+(mins<1?"just now":mins<60?mins+"m ago":Math.floor(mins/60)+"h ago");
     src.className="srcnote live";
-    src.textContent="● LIVE arrivals"+(LIVE_QUOTA&&LIVE_QUOTA.rem!=null?"  ·  ~"+LIVE_QUOTA.rem+" API calls left":"");
+    src.textContent="● LIVE · "+fmtClockHST(liveUpdated)+" ("+ago+")"+(LIVE_QUOTA&&LIVE_QUOTA.rem!=null?"  ·  ~"+LIVE_QUOTA.rem+" calls left":"");
   }else{
-    btn.classList.add("none"); btn.textContent = loadKey()?"Update — go live":"Add key";
+    btn.classList.add("none");
     src.className="srcnote"; src.textContent="Sample timetable — not live data";
   }
 }
