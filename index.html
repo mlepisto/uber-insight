@@ -186,8 +186,13 @@
   .livechip .dot{width:7px;height:7px;border-radius:50%;background:#4ade80;box-shadow:0 0 0 0 rgba(74,222,128,.6);animation:pulse2 2s infinite}
   @keyframes pulse2{0%{box-shadow:0 0 0 0 rgba(74,222,128,.5)}70%{box-shadow:0 0 0 7px rgba(74,222,128,0)}100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}}
   @media (prefers-reduced-motion:reduce){.livechip .dot{animation:none}}
-  .livechip.off{color:rgba(244,238,223,.4)}
-  .livechip.off .dot{background:rgba(244,238,223,.4);animation:none}
+  .livechip{cursor:pointer}
+  .livechip.off{color:rgba(244,238,223,.5)}
+  .livechip.off .dot{background:rgba(244,238,223,.45);animation:none}
+  .livechip.loading{color:var(--board-amber)}
+  .livechip.loading .dot{background:var(--board-amber)}
+  .livechip.err{color:#ff8a6a}
+  .livechip.err .dot{background:#ff6b4a;animation:none}
 
   .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:14px 4px 0}
   .legend span{display:inline-flex;align-items:center;gap:6px}
@@ -264,14 +269,14 @@
   <details class="live" id="livepanel">
     <summary><span>Live status &amp; ETAs <span style="font-weight:400;color:var(--faint)">— real delays</span></span><span class="livedot" id="livedot"></span></summary>
     <div class="livebody">
-      <p>Your browser pulls arrivals <b>live, straight from the source</b> — no server. Today switches to the real feed: actual flight numbers, computed delays (ON TIME / LATE / LANDED), late flights re-bucketed into the window they really land in. Auto-refreshes every ~3 min while open.</p>
-      <p><b>Setup once (free, no card, ~2 min):</b> make a <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">RapidAPI account</a>, subscribe to AeroDataBox's <b>Basic (free)</b> plan, copy the key, paste it below. It's saved on this device only — never uploaded, never in the page.</p>
+      <p>Your browser pulls arrivals <b>live, straight from the source</b> — no server. Today switches to the real feed: actual flight numbers, delays (ON TIME / LATE / LANDED), late flights re-bucketed into the window they really land in.</p>
+      <p><b>Refreshes on each page load</b> (and when you tap the LIVE badge up top). One or two API calls per load — a few opens a day stays far under the free monthly quota.</p>
+      <p><b>Setup once (free, no card, ~2 min):</b> make a <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">RapidAPI account</a>, subscribe to AeroDataBox's <b>Basic (free)</b> plan, copy the key, paste it below. Saved on this device only.</p>
       <label for="akey">AeroDataBox RapidAPI key</label>
       <input id="akey" type="password" placeholder="paste key — stored on this device only" autocomplete="off" />
       <div class="btnrow">
         <button class="act primary" id="golive">Go live</button>
         <button class="act ghost" id="clearlive">Turn off</button>
-        <label style="display:inline-flex;align-items:center;gap:6px;margin:0;color:var(--muted);font-weight:500"><input type="checkbox" id="autolive" style="width:auto" /> auto-refresh</label>
       </div>
       <div class="livemsg" id="livemsg"></div>
     </div>
@@ -514,6 +519,8 @@ let liveFlights=null;   // real arrivals array when browser "Go live" is on (tod
 let liveActive=false;
 let liveUpdated=0;      // epoch ms of last successful browser fetch
 let autoTimer=null;
+let LIVE_STATE="off";   // off | loading | ok | error
+let LIVE_QUOTA=null;    // {rem, lim} from RapidAPI headers when exposed
 
 function render(){
   const now = hstNow();
@@ -685,11 +692,13 @@ function buildStrip(){
 /* ---- clock + live chip ---- */
 function updateLiveChip(){
   const c=$("#livechip"),t=$("#livechiptxt");
-  if(liveActive){
-    c.classList.remove("off");
+  c.classList.remove("off","err","loading");
+  if(LIVE_STATE==="loading"){ c.classList.add("loading"); t.textContent="Connecting…"; }
+  else if(LIVE_STATE==="ok" && liveActive){
     const ago=liveUpdated?Math.max(0,Math.round((Date.now()-liveUpdated)/60000)):0;
     t.textContent="Live · "+(ago<1?"now":ago+"m ago");
-  }else{ c.classList.add("off"); t.textContent="Schedule"; }
+  }else if(LIVE_STATE==="error"){ c.classList.add("err"); t.textContent="Feed error — tap"; }
+  else { c.classList.add("off"); t.textContent="Schedule — tap for live"; }
 }
 function tick(){
   const n=hstNow();
@@ -702,8 +711,6 @@ function tick(){
 /* ---- live status (AeroDataBox free tier) ---- */
 function loadKey(){try{return localStorage.getItem("ogg_adb_key")||"";}catch(e){return"";}}
 function saveKey(k){try{k?localStorage.setItem("ogg_adb_key",k):localStorage.removeItem("ogg_adb_key");}catch(e){}}
-function loadAuto(){try{return localStorage.getItem("ogg_auto")!=="0";}catch(e){return true;}} // default ON
-function saveAuto(v){try{localStorage.setItem("ogg_auto",v?"1":"0");}catch(e){}}
 function setDot(on){$("#livedot").classList.toggle("on",on);}
 
 function parseArrivals(arr){
@@ -745,48 +752,71 @@ function parseArrivals(arr){
 
 async function fetchLive(){
   const key=(loadKey()||$("#akey").value).trim();
-  if(!key) throw new Error("no key");
+  if(!key) throw new Error("NO_KEY");
   const n=hstNow();
-  const start=ymd(n)+"T00:00", end=ymd(n)+"T23:59";
-  // AeroDataBox FIDS: arrivals at PHOG. Split into two 12h windows (API max 12h/call).
   const base="https://aerodatabox.p.rapidapi.com/flights/airports/icao/PHOG/";
   const opt="?direction=Arrival&withLeg=false&withCancelled=true&withCodeshared=false&withLocation=false";
   const hdr={headers:{"X-RapidAPI-Key":key,"X-RapidAPI-Host":"aerodatabox.p.rapidapi.com"}};
-  const w1=ymd(n)+"T00:00/"+ymd(n)+"T11:59", w2=ymd(n)+"T12:00/"+ymd(n)+"T23:59";
-  const [r1,r2]=await Promise.all([fetch(base+w1+opt,hdr),fetch(base+w2+opt,hdr)]);
-  if(!r1.ok) throw new Error("HTTP "+r1.status+(r1.status===403?" — check subscription":r1.status===429?" — rate limit (free tier)":r1.status===401?" — bad key":""));
-  const j1=await r1.json(); const j2=r2.ok?await r2.json():{arrivals:[]};
-  return (j1.arrivals||[]).concat(j2.arrivals||[]);
+  // Only the rest of today, from ~30 min ago. Chunk into <=12h windows (API cap):
+  // 1 call after ~noon, 2 in the early morning. Keeps calls per page-load minimal.
+  const dayStr=ymd(n);
+  const hm=m=>pad(Math.floor(m/60))+":"+pad(m%60);
+  const fromMin=Math.max(0,(n.getHours()*60+n.getMinutes())-30), endMin=23*60+59;
+  const wins=[]; for(let s=fromMin;s<endMin;){ const e=Math.min(endMin,s+12*60-1); wins.push([s,e]); s=e+1; }
+  let arrivals=[]; LIVE_QUOTA=null;
+  for(const [a,b] of wins){
+    const r=await fetch(base+dayStr+"T"+hm(a)+"/"+dayStr+"T"+hm(b)+opt, hdr);
+    const rem=r.headers.get("x-ratelimit-requests-remaining"), lim=r.headers.get("x-ratelimit-requests-limit");
+    if(rem!=null||lim!=null) LIVE_QUOTA={rem,lim};
+    if(!r.ok) throw new Error("HTTP_"+r.status);
+    const j=await r.json(); arrivals=arrivals.concat(j.arrivals||[]);
+  }
+  return arrivals;
 }
 
-async function goLive(silent){
+function setLiveState(state, detail){
+  LIVE_STATE=state;
   const msg=$("#livemsg");
+  if(state==="loading"){ msg.className="livemsg"; msg.textContent="Connecting to the live feed…"; }
+  else if(state==="ok"){ msg.className="livemsg ok"; msg.textContent=detail; }
+  else if(state==="error"){ msg.className="livemsg err"; msg.textContent=detail; try{$("#livepanel").open=true;}catch(e){} }
+  else { msg.className="livemsg"; msg.textContent=detail||""; }
+  updateLiveChip();
+}
+
+async function goLive(){
   const key=$("#akey").value.trim()||loadKey();
-  if(!key){ if(!silent){msg.className="livemsg err";msg.textContent="Paste your AeroDataBox key first.";} return; }
+  if(!key){ setLiveState("error","Paste your AeroDataBox key, then tap Go live."); return; }
   saveKey(key);
-  if(!silent){msg.className="livemsg";msg.textContent="Fetching live OGG arrivals…";}
+  setLiveState("loading"); render();
   try{
     const arr=await fetchLive();
     liveFlights=parseArrivals(arr);
-    liveActive=true; liveUpdated=Date.now(); setDot(true);
-    SEL=0; buildStrip();
-    if(!silent){msg.className="livemsg ok";msg.textContent="Live: "+liveFlights.length+" arrivals loaded. Today now shows real ETAs.";}
-    updateLiveChip(); render();
-    if($("#autolive").checked) startAuto();
+    liveActive=true; liveUpdated=Date.now(); setDot(true); SEL=0; buildStrip();
+    const q = LIVE_QUOTA&&LIVE_QUOTA.rem!=null ? "  ·  ~"+LIVE_QUOTA.rem+(LIVE_QUOTA.lim?"/"+LIVE_QUOTA.lim:"")+" API calls left this month" : "";
+    setLiveState("ok", (liveFlights.length
+      ? liveFlights.length+" arrivals — today shows real ETAs."
+      : "Feed reached, but 0 arrivals in the window. Odd for OGG — check the date/subscription.")+q);
+    render();
   }catch(e){
-    if(e.message!=="no key"){ liveActive=false; setDot(false); }
-    if(!silent){msg.className="livemsg err";msg.textContent="Couldn’t load live feed ("+e.message+"). Staying on the offline timetable.";}
-    updateLiveChip(); render();
+    liveActive=false; setDot(false);
+    let m;
+    if(e.message==="NO_KEY") m="Paste your key first.";
+    else if(e.message==="HTTP_401") m="Key rejected (401) — recopy the whole key from RapidAPI.";
+    else if(e.message==="HTTP_403") m="403 — your RapidAPI account isn’t subscribed to AeroDataBox’s free plan yet. Subscribe (free, no card), then retry.";
+    else if(e.message==="HTTP_429") m="429 — this month’s free quota is used up. It resets next cycle.";
+    else if(/^HTTP_/.test(e.message)) m="Feed error ("+e.message.replace("HTTP_","HTTP ")+").";
+    else m="Browser couldn’t reach the feed. Either you’re offline, or the feed blocks in-browser calls (CORS). If it’s CORS, it can’t be fixed client-side — it needs a small proxy.";
+    setLiveState("error", m+" Showing the typical timetable meanwhile.");
+    render();
   }
 }
 function clearLive(){
-  liveFlights=null; liveActive=false; liveUpdated=0; setDot(false); stopAuto();
-  $("#akey").value=""; saveKey(""); $("#autolive").checked=false; saveAuto(false);
-  $("#livemsg").className="livemsg"; $("#livemsg").textContent="Live off — showing the offline timetable.";
-  updateLiveChip(); render();
+  liveFlights=null; liveActive=false; liveUpdated=0; LIVE_QUOTA=null; setDot(false);
+  $("#akey").value=""; saveKey("");
+  setLiveState("off","Live off — showing the typical timetable.");
+  render();
 }
-function startAuto(){ stopAuto(); autoTimer=setInterval(()=>{ if(!document.hidden) goLive(true); },180000); }
-function stopAuto(){ if(autoTimer){clearInterval(autoTimer);autoTimer=null;} }
 
 /* ---- load the editable cruise schedule (data/cruise.json) ---- */
 async function loadData(){
@@ -799,16 +829,16 @@ async function loadData(){
 
 /* ---- boot ---- */
 $("#akey").value=loadKey();
-$("#autolive").checked=loadAuto();
-$("#golive").addEventListener("click",()=>goLive(false));
+$("#golive").addEventListener("click",goLive);
 $("#clearlive").addEventListener("click",clearLive);
-$("#autolive").addEventListener("change",e=>{ saveAuto(e.target.checked); if(e.target.checked){ if(liveActive)startAuto(); } else stopAuto(); });
-document.addEventListener("visibilitychange",()=>{ if(!document.hidden && liveActive && loadAuto()){ const ago=Date.now()-liveUpdated; if(ago>120000) goLive(true); } });
+$("#livechip").addEventListener("click",()=>{ if(loadKey()||$("#akey").value.trim()) goLive(); else { try{$("#livepanel").open=true; $("#livepanel").scrollIntoView({behavior:"smooth"});}catch(e){} } });
+// Re-pull when you come back to the tab if the data is stale (>15 min). No background timer.
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && liveActive && (Date.now()-liveUpdated>900000)) goLive(); });
 buildStrip();
 tick();
 render();
 loadData();               // load the cruise schedule from data/cruise.json (falls back to built-in if absent)
-setInterval(tick,30000);
-// auto-start the live client-side feed if a key is already saved
-if(loadKey()){ goLive(true); }
+setInterval(tick,30000);  // clock + "Xm ago" only; no API calls
+// Fetch live once on load if a key is saved
+if(loadKey()) goLive();
 </script>
