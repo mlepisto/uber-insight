@@ -109,9 +109,9 @@
   .upd.stale,.upd.err{background:var(--accent);border-color:transparent}
   .upd.none{background:var(--surface-2);color:var(--ink)}
   .upd.loading{background:var(--muted);color:#fff;opacity:.8}
-  .srcnote{font-size:11.5px;letter-spacing:.02em;text-transform:none;color:var(--faint);margin-top:8px;font-weight:500}
-  .srcnote.live{color:var(--good)}
-  .srcnote.err{color:var(--accent)}
+  .srcinline{font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--faint);font-weight:500;margin-left:2px}
+  .srcinline.live{color:var(--good)}
+  .srcinline.err{color:var(--accent)}
   .pulse{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 rgba(46,139,87,.5);animation:pulse 2.4s infinite}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(46,139,87,.45)}70%{box-shadow:0 0 0 9px rgba(46,139,87,0)}100%{box-shadow:0 0 0 0 rgba(46,139,87,0)}}
   @media (prefers-reduced-motion:reduce){.pulse{animation:none}}
@@ -241,7 +241,6 @@
       <div>
         <div class="clock tnum" id="clock">--:--</div>
         <div class="cd" id="clockday">Hawai‘i Time</div>
-        <div class="livechip off" id="livechip"><span class="dot"></span><span id="livechiptxt">Schedule</span></div>
       </div>
     </div>
     <div class="daystrip" id="daystrip"></div>
@@ -249,11 +248,10 @@
 
   <section class="now" id="nowcard" aria-live="polite">
     <div class="now-head">
-      <span class="nh-l"><span class="pulse" id="nowpulse"></span> <span id="nowlabel">Right now at OGG</span></span>
+      <span class="nh-l"><span class="pulse" id="nowpulse"></span> <span id="nowlabel">Right now</span><span class="srcinline" id="srcnote"></span></span>
       <button class="upd none" id="updatebtn" type="button">Update</button>
     </div>
-    <div class="srcnote" id="srcnote">Sample timetable — not live data</div>
-    <div class="now-grid">
+    <div class="now-grid" id="nowgrid">
       <div class="stat">
         <div class="k">This 30-min block</div>
         <div class="v tnum"><span id="nowseats">0</span> <small>seats</small></div>
@@ -580,27 +578,23 @@ function render(){
     ch.appendChild(div);
   });
 
-  // NOW card (only meaningful for today; for future days show day totals)
-  const pulse=$("#nowpulse");
+  // NOW card. Today: live "right now" stats + controls. Future: a slim outlook, no live controls.
+  const pulse=$("#nowpulse"), grid=$("#nowgrid"), btn=$("#updatebtn"), src=$("#srcnote");
   if(isToday){
-    $("#nowlabel").textContent="Right now at OGG";
-    pulse.style.display="";
+    $("#nowlabel").textContent="Right now";
+    pulse.hidden=false; grid.hidden=false; btn.hidden=false; src.hidden=false;
     const cur = blocks.find(b=>nowMin>=b.m && nowMin<b.m+30);
     $("#nowseats").textContent = cur?cur.seats:0;
     $("#nowflights").textContent = cur&&cur.fl.length? cur.fl.length+" flight"+(cur.fl.length>1?"s":"")+" landing" : "no arrivals this block";
-    // next 90 min
     const soon = flights.filter(f=>!f.cancelled && f.effMin>=nowMin && f.effMin<nowMin+60);
     $("#soonseats").textContent = soon.reduce((s,f)=>s+f.seats,0);
     $("#soonflights").textContent = "across "+soon.length+" flight"+(soon.length!==1?"s":"");
+    refreshStatusUI();
   }else{
-    $("#nowlabel").textContent="Day outlook";
-    pulse.style.display="none";
-    const tot=flights.reduce((s,f)=>s+f.seats,0);
-    const wb=flights.filter(f=>f.wb).length;
-    $("#nowseats").textContent=tot.toLocaleString();
-    $("#nowflights").textContent=flights.length+" arrivals";
-    $("#soonseats").textContent=wb;
-    $("#soonflights").textContent="widebody arrivals (big loads)";
+    // Future day: no "right now", no live. Just a compact outlook line.
+    const tot=flights.reduce((s,f)=>s+f.seats,0), wb=flights.filter(f=>f.wb).length;
+    $("#nowlabel").textContent = DOW[day.getDay()]+" outlook · "+flights.length+" arrivals · "+tot.toLocaleString()+" seats"+(wb?" · "+wb+" widebody":"");
+    pulse.hidden=true; grid.hidden=true; btn.hidden=true; src.hidden=true; src.textContent="";
   }
 
   // next best wave (today: upcoming; future: peak of day)
@@ -710,6 +704,7 @@ function buildStrip(){
 /* ---- clock + live chip ---- */
 function updateLiveChip(){
   const c=$("#livechip"),t=$("#livechiptxt");
+  if(!c||!t) return; // header chip removed; status now lives on the now-card
   c.classList.remove("off","err","loading");
   if(LIVE_STATE==="loading"){ c.classList.add("loading"); t.textContent="Connecting…"; }
   else if(LIVE_STATE==="ok" && liveActive){
@@ -831,20 +826,21 @@ function loadCache(){
 function refreshStatusUI(){
   const btn=$("#updatebtn"), src=$("#srcnote");
   if(!btn||!src) return;
+  if(SEL!==0) return; // future days hide the live controls (handled in render)
   btn.classList.remove("fresh","aging","stale","none","loading","err");
-  if(LIVE_STATE==="loading"){ btn.classList.add("loading"); btn.textContent="Updating…"; src.className="srcnote"; src.textContent="Fetching live arrivals…"; return; }
-  if(LIVE_STATE==="error"){ btn.classList.add("err"); btn.textContent="Retry"; src.className="srcnote err"; src.textContent="Live feed error — see panel below"; return; }
+  if(LIVE_STATE==="loading"){ btn.classList.add("loading"); btn.textContent="Updating…"; src.className="srcinline"; src.textContent="· updating…"; return; }
+  if(LIVE_STATE==="error"){ btn.classList.add("err"); btn.textContent="Retry"; src.className="srcinline err"; src.textContent="· feed error (see panel)"; return; }
   btn.textContent="Update";
   if(liveActive && liveUpdated){
     const mins=Math.round((Date.now()-liveUpdated)/60000);
     const lvl=mins<30?"fresh":mins<120?"aging":"stale";
-    const ago=mins<1?"just now":mins<60?mins+"m ago":Math.floor(mins/60)+"h ago";
+    const ago=mins<1?"just now":mins<60?mins+"m":Math.floor(mins/60)+"h";
     btn.classList.add(lvl);
-    src.className="srcnote live";
-    src.textContent="● LIVE · "+fmtClockHST(liveUpdated)+" ("+ago+")"+quotaText();
+    src.className="srcinline live";
+    src.textContent=" · LIVE "+fmtClockHST(liveUpdated)+" ("+ago+")"+quotaText();
   }else{
     btn.classList.add("none");
-    src.className="srcnote"; src.textContent="Sample timetable — not live data";
+    src.className="srcinline"; src.textContent=" · sample data";
   }
 }
 
