@@ -52,7 +52,8 @@ function cruiseFor(dateStr, calls){
 function buildHTML(today, flightsByDay, calls){
   const A="#E4572E",T="#0E7C7B",ink="#182A31",muted="#5E6E74";
   let h=`<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:600px;margin:0 auto;color:${ink}">`;
-  h+=`<h2 style="margin:0 0 2px">OGG Wave Board</h2><div style="color:${muted};font-size:13px;margin-bottom:14px">${label(today)} · daily brief</div>`;
+  h+=`<h2 style="margin:0 0 2px">OGG Wave Board</h2><div style="color:${muted};font-size:13px;margin-bottom:10px">${label(today)} · daily brief</div>`;
+  h+=`<div style="margin:0 0 16px"><a href="https://mlepisto.github.io/uber-insight/" style="display:inline-block;background:${A};color:#fff;text-decoration:none;font-weight:700;padding:11px 18px;border-radius:9px">Open the live dashboard &rarr;</a></div>`;
   // TODAY
   h+=`<h3 style="margin:16px 0 6px;border-bottom:2px solid ${A};padding-bottom:4px">Today — ${label(today)}</h3>`;
   const s=daySummary(flightsByDay[today]);
@@ -64,15 +65,23 @@ function buildHTML(today, flightsByDay, calls){
   if(ct.length) for(const c of ct){ h+=`<div style="margin:8px 0;padding:8px 10px;background:#eef6f5;border-left:3px solid ${T};border-radius:6px"><b>${esc(c.ship)}</b> <span style="color:${muted}">${esc(c.line)}${c.pax?" · ~"+c.pax.toLocaleString()+" pax":""} · ${c.span}</span>`;
     for(const w of c.win) h+=`<div style="font-size:13px;color:${T};font-weight:600">${w}</div>`; h+=`</div>`; }
   else h+=`<p style="margin:6px 0;color:${muted}">No cruise ship in port today.</p>`;
-  // NEXT DAYS (rest of the rolling window)
-  h+=`<h3 style="margin:20px 0 6px;border-bottom:2px solid ${T};padding-bottom:4px">Coming days</h3>`;
-  for(let i=1;i<=6;i++){ const d=hstDate(i), cr=cruiseFor(d,calls), ss=daySummary(flightsByDay[d]);
-    h+=`<div style="margin:7px 0;padding-bottom:7px;border-bottom:1px solid #eee"><b>${label(d)}</b>`;
-    if(ss) h+=` <span style="color:${muted}">— ${ss.arrivals} arr · ${ss.seats.toLocaleString()} seats${ss.wb?" · "+ss.wb+" WB":""}</span>`;
-    if(cr.length) for(const c of cr) h+=`<div style="color:${T};font-weight:600;font-size:13px">🚢 ${esc(c.ship)} — ${c.span}</div>`;
-    else if(!ss) h+=` <span style="color:${muted}">—</span>`;
-    h+=`</div>`; }
-  h+=`<p style="color:${muted};font-size:11px;margin-top:16px">Cruise: CruiseMapper. Flights: AeroDataBox. Times HST. Day-of status is a fresh pull; open the board and tap Update for to-the-minute delays.</p></div>`;
+  // NEXT 7 DAYS — email-safe bar strip (flight seats in coral, cruise pax in teal)
+  h+=`<h3 style="margin:20px 0 6px;border-bottom:2px solid ${T};padding-bottom:4px">Next 7 days</h3>`;
+  const wk=[]; let maxT=1;
+  for(let i=0;i<7;i++){ const d=hstDate(i), s=daySummary(flightsByDay[d]), cr=cruiseFor(d,calls);
+    const fl=s?s.seats:0, cpax=cr.reduce((a,c)=>a+(c.pax||0),0), t=fl+cpax;
+    if(t>maxT)maxT=t; wk.push({d,fl,cpax,ship:cr[0]?cr[0].ship:null,t}); }
+  h+=`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px">`;
+  for(const r of wk){ const pf=Math.round(r.fl/maxT*100), pc=Math.round(r.cpax/maxT*100), rest=Math.max(0,100-pf-pc);
+    h+=`<tr><td style="padding:5px 8px 5px 0;white-space:nowrap;color:${ink};font-weight:600;width:74px">${label(r.d)}</td>`+
+      `<td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>`+
+      (pf>0?`<td width="${pf}%" style="background:${A};height:15px;font-size:0;line-height:0">&nbsp;</td>`:``)+
+      (pc>0?`<td width="${pc}%" style="background:${T};height:15px;font-size:0;line-height:0">&nbsp;</td>`:``)+
+      `<td width="${rest}%" style="font-size:0;line-height:0">&nbsp;</td></tr></table></td>`+
+      `<td style="padding:5px 0 5px 10px;text-align:right;white-space:nowrap;color:${muted}">${r.t.toLocaleString()}${r.ship?` 🚢`:``}</td></tr>`; }
+  h+=`</table>`;
+  h+=`<p style="color:${muted};font-size:12px;margin:8px 2px 0"><span style="color:${A};font-weight:700">■</span> flight seats &nbsp; <span style="color:${T};font-weight:700">■</span> cruise pax &nbsp; 🚢 ship in port. Tap the dashboard for the interactive by-hour and by-day curves.</p>`;
+  h+=`<p style="color:${muted};font-size:11px;margin-top:14px">Cruise: CruiseMapper. Flights: AeroDataBox. Times HST. Day-of status is a fresh pull; open the board and tap Update for to-the-minute delays.</p></div>`;
   return h;
 }
 

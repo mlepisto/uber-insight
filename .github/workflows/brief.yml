@@ -2,7 +2,9 @@ name: Daily OGG pull + email
 
 on:
   schedule:
-    - cron: "0 15 * * *"   # 05:00 HST daily
+    # 14:35 UTC = 04:35 HST. Off the congested :00 slot and a bit early to buffer
+    # GitHub's scheduled-run delay (cron here is best-effort, not punctual).
+    - cron: "35 14 * * *"
   workflow_dispatch:
     inputs:
       dry:
