@@ -1,0 +1,47 @@
+name: Daily OGG pull + email
+
+on:
+  schedule:
+    - cron: "0 15 * * *"   # 05:00 HST daily
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "1 = compose email but don't send (preview in log)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-brief
+  cancel-in-progress: false
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Pull flight schedule (rolling 5 days, today fresh)
+        env:
+          AERODATABOX_KEY: ${{ secrets.AERODATABOX_KEY }}
+        run: node scripts/flights.mjs
+
+      - name: Commit refreshed schedule
+        run: |
+          git config user.name "ogg-flights-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/flights.json
+          if git diff --cached --quiet; then echo "no change"; else git commit -m "data: refresh OGG flight schedule"; git push; fi
+
+      - name: Build & send daily email
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_TO: ${{ vars.EMAIL_TO }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          DRY: ${{ inputs.dry }}
+        run: node scripts/email-brief.mjs

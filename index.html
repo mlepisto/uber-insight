@@ -408,6 +408,11 @@ function weight(o){
 }
 
 function flightsForDate(d){
+  // Prefer the committed real schedule (data/flights.json) for any day it covers.
+  const key = ymd(d);
+  if(SCHED && SCHED.days && SCHED.days[key] && SCHED.days[key].length){
+    return SCHED.days[key].slice().sort((a,b)=>a.effMin-b.effMin);
+  }
   const dow = d.getDay();
   const weekend = (dow===0||dow===5||dow===6);
   let list = INTER.concat(MAIN);
@@ -536,6 +541,8 @@ let liveUpdated=0;      // epoch ms of last successful browser fetch
 let autoTimer=null;
 let LIVE_STATE="off";   // off | loading | ok | error
 let LIVE_QUOTA=null;    // {rem, lim} from RapidAPI headers when exposed
+let SCHED=null;         // committed data/flights.json {day, days:{date:[...]}, updated}
+let SCHED_UPDATED=0;    // epoch ms of the committed schedule
 
 function render(){
   const now = hstNow();
@@ -689,7 +696,7 @@ function fmtClockHST(ms){ if(!ms) return ""; const d=new Date(ms-36000000); retu
 /* ---- day strip ---- */
 function buildStrip(){
   const now=hstNow(); const strip=$("#daystrip"); strip.innerHTML="";
-  for(let i=0;i<8;i++){
+  for(let i=0;i<5;i++){
     const d=addDays(now,i);
     const has=cruiseForDate(d).length>0;
     const b=document.createElement("button");
@@ -838,6 +845,9 @@ function refreshStatusUI(){
     btn.classList.add(lvl);
     src.className="srcinline live";
     src.textContent=" · LIVE "+fmtClockHST(liveUpdated)+" ("+ago+")"+quotaText();
+  }else if(SCHED && SCHED.day===ymd(hstNow()) && SCHED.days[SCHED.day] && SCHED.days[SCHED.day].length){
+    btn.classList.add("aging");   // real schedule, but not a to-the-minute pull
+    src.className="srcinline live"; src.textContent=" · schedule (auto"+(SCHED_UPDATED?" "+fmtClockHST(SCHED_UPDATED):"")+") · tap Update for live delays";
   }else{
     btn.classList.add("none");
     src.className="srcinline"; src.textContent=" · sample data";
@@ -889,13 +899,22 @@ function clearLive(){
   render();
 }
 
-/* ---- load the editable cruise schedule (data/cruise.json) ---- */
+/* ---- load committed data: cruise schedule + rolling flight schedule ---- */
 async function loadData(){
   try{
     const r=await fetch("./data/cruise.json",{cache:"no-store"});
     if(r.ok){ const j=await r.json(); if(Array.isArray(j.calls)){ CRUISE_CALLS.length=0; j.calls.forEach(c=>CRUISE_CALLS.push(c)); } }
   }catch(e){}
-  buildStrip(); updateLiveChip(); render();
+  try{
+    const r=await fetch("./data/flights.json",{cache:"no-store"});
+    if(r.ok){ const j=await r.json();
+      if(j&&j.days&&Object.keys(j.days).length){ SCHED=j; SCHED_UPDATED=Date.parse(j.updated||"")||0;
+        // teach the city map any origins the feed used
+        Object.values(j.days).forEach(list=>list.forEach(f=>{ if(f.org&&f.orgName&&!CITY[f.org]) CITY[f.org]=f.orgName; }));
+      }
+    }
+  }catch(e){}
+  buildStrip(); updateLiveChip(); refreshStatusUI(); render();
 }
 
 /* ---- boot ---- */
