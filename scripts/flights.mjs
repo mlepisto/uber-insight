@@ -56,7 +56,7 @@ async function fetchDay(dateStr, isToday){
     const st=(f.status||"").toLowerCase(), cancelled=/cancel/.test(st), landed=!!runT||/arriv|landed|onblock|gatearriv/.test(st);
     const ap=mv.airport||{}, org=(ap.iata||ap.icao||"").toUpperCase(), ac=seatFromModel(f.aircraft&&f.aircraft.model);
     let delay=effMin-schedMin; if(delay>720)delay-=1440; if(delay<-720)delay+=1440;
-    out.push({ min:schedMin, effMin:landed?effMin:Math.max(schedMin,effMin), time:schedHM,
+    out.push({ min:schedMin, effMin, time:schedHM,   // effMin = actual/revised/predicted — early flights bucket earlier too
       flt:(f.number||"").replace(/\s/g,""), carrier:name, org, orgName:(CITY[org]||ap.name||org),
       seats:ac.s, wb:ac.wb, cls:ac.wb?"Widebody":"Narrowbody", acname:ac.name, inter:INTER.has(org),
       live:!!isToday, status:f.status||"", delayMin:Math.round(delay), landed, cancelled,

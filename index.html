@@ -872,7 +872,7 @@ function parseArrivals(arr){
     let delay=effMin-schedMin;
     if(delay>720)delay-=1440; if(delay<-720)delay+=1440; // guard midnight wrap
     out.push({
-      min:schedMin, effMin:landed?effMin:Math.max(schedMin,effMin), time:schedHM,
+      min:schedMin, effMin, time:schedHM,   // effMin = actual/revised/predicted time — early flights bucket earlier too
       flt:(f.number||"").replace(/\s/g,""),
       carrier:(f.airline&&f.airline.name)||"",
       org:org, orgName:(CITY[org]||ap.name||org),
