@@ -1,19 +1,21 @@
 name: Scrape Kahului cruise schedule
 
 on:
+  schedule:
+    - cron: "0 12 * * 1"   # weekly, Monday 12:00 UTC (02:00 HST)
   workflow_dispatch:
     inputs:
-      month:
-        description: "Month to fetch (YYYY-MM), recon only"
-        required: false
-        default: "2026-11"
       recon:
-        description: "Recon mode (1 = dump HTML to log, blank = parse+commit)"
+        description: "1 = dump HTML to log instead of writing"
         required: false
-        default: "1"
+        default: ""
 
 permissions:
   contents: write
+
+concurrency:
+  group: cruise-scrape
+  cancel-in-progress: false
 
 jobs:
   scrape:
@@ -23,9 +25,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Run scraper
+      - name: Scrape
         env:
-          MONTH: ${{ inputs.month }}
           RECON: ${{ inputs.recon }}
         run: node scripts/cruise-scrape.mjs
       - name: Commit if changed

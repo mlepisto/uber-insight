@@ -573,7 +573,7 @@ function render(){
     }
     div.innerHTML='<div class="ic">Cruise</div><div class="body">'+
       '<div class="chead"><b>'+c.ship+'</b> <span class="ctag">'+tag+'</span></div>'+
-      '<div class="meta">'+c.line+' · ~'+c.pax.toLocaleString()+' pax · '+span+'</div>'+
+      '<div class="meta">'+c.line+(c.pax?' · ~'+c.pax.toLocaleString()+' pax':'')+' · '+span+'</div>'+
       '<div class="cwins">'+win+'</div></div>';
     ch.appendChild(div);
   });
