@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const KEY = process.env.AERODATABOX_KEY;
 if(!KEY){ console.log("No AERODATABOX_KEY — leaving data/flights.json unchanged."); process.exit(0); }
 const OUT = "data/flights.json";
-const DAYS = 5; // today + next 4
+const DAYS = 7; // today + next 6
 
 const pad=n=>String(n).padStart(2,"0");
 const toMin=t=>{const[a,b]=t.split(":").map(Number);return a*60+b;};

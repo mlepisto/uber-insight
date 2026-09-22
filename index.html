@@ -696,7 +696,7 @@ function fmtClockHST(ms){ if(!ms) return ""; const d=new Date(ms-36000000); retu
 /* ---- day strip ---- */
 function buildStrip(){
   const now=hstNow(); const strip=$("#daystrip"); strip.innerHTML="";
-  for(let i=0;i<5;i++){
+  for(let i=0;i<7;i++){
     const d=addDays(now,i);
     const has=cruiseForDate(d).length>0;
     const b=document.createElement("button");

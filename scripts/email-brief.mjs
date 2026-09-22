@@ -66,7 +66,7 @@ function buildHTML(today, flightsByDay, calls){
   else h+=`<p style="margin:6px 0;color:${muted}">No cruise ship in port today.</p>`;
   // NEXT DAYS (rest of the rolling window)
   h+=`<h3 style="margin:20px 0 6px;border-bottom:2px solid ${T};padding-bottom:4px">Coming days</h3>`;
-  for(let i=1;i<=4;i++){ const d=hstDate(i), cr=cruiseFor(d,calls), ss=daySummary(flightsByDay[d]);
+  for(let i=1;i<=6;i++){ const d=hstDate(i), cr=cruiseFor(d,calls), ss=daySummary(flightsByDay[d]);
     h+=`<div style="margin:7px 0;padding-bottom:7px;border-bottom:1px solid #eee"><b>${label(d)}</b>`;
     if(ss) h+=` <span style="color:${muted}">— ${ss.arrivals} arr · ${ss.seats.toLocaleString()} seats${ss.wb?" · "+ss.wb+" WB":""}</span>`;
     if(cr.length) for(const c of cr) h+=`<div style="color:${T};font-weight:600;font-size:13px">🚢 ${esc(c.ship)} — ${c.span}</div>`;
