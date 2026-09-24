@@ -174,6 +174,15 @@
   .bmid{min-width:0}
   .bbar-track{height:8px;background:var(--bar-track);border-radius:999px;overflow:hidden}
   .bbar{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--amber),var(--accent))}
+  .bbar.arr{background:linear-gradient(90deg,var(--amber),var(--accent))}
+  .bbar.dep{background:linear-gradient(90deg,#4bb7b0,var(--teal))}
+  .dual{display:flex;flex-direction:column;gap:5px}
+  .dual .db{display:grid;grid-template-columns:16px 1fr auto;gap:8px;align-items:center}
+  .dual .db .ic{font-size:12px;line-height:1;text-align:center}
+  .dual .db .bbar-track{height:7px}
+  .dual .db .n{font-size:11.5px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .dual .db.a .n{color:var(--accent)} .dual .db.d .n{color:var(--teal)}
+  .dual + .bmeta{margin-top:6px}
   .bmeta{display:flex;gap:10px;align-items:center;margin-top:5px;font-size:12px;color:var(--muted);flex-wrap:wrap}
   .bmeta .seats{font-weight:600;color:var(--ink)}
   .wb{color:var(--teal);font-weight:600}
@@ -342,8 +351,8 @@
   <div class="blocks" id="blocks"></div>
 
   <div class="legend">
-    <span><i class="sw" style="background:linear-gradient(90deg,var(--amber),var(--accent))"></i> wave size = riders in this window</span>
-    <span><i class="sw" style="background:var(--teal)"></i> widebody (big load)</span>
+    <span><i class="sw" style="background:linear-gradient(90deg,var(--amber),var(--accent))"></i> 🛬 arrivals (riders in)</span>
+    <span><i class="sw" style="background:linear-gradient(90deg,#4bb7b0,var(--teal))"></i> 🛫 departures (riders out)</span>
     <span><i class="sw" style="background:var(--accent)"></i> peak = best odds</span>
   </div>
 
@@ -841,15 +850,29 @@ function render(){
       else if(cxl) blockBadge='<span class="fst cxl">'+cxl+' cxl</span>';
     }
 
+    // middle column: two bars (arr/dep) on the All tab, one tinted bar otherwise
+    let midHTML;
+    if(!b.fl.length){
+      midHTML='<div class="bmeta"><span>—</span></div>';
+    }else if(DIR==="all"){
+      const arrSeats=b.fl.filter(f=>f.dir==="arr").reduce((s,f)=>s+f.seats,0);
+      const depSeats=b.fl.filter(f=>f.dir==="dep").reduce((s,f)=>s+f.seats,0);
+      const aW=Math.round(arrSeats/maxSeats*100), dW=Math.round(depSeats/maxSeats*100);
+      midHTML='<div class="dual">'+
+        '<div class="db a"><span class="ic">🛬</span><div class="bbar-track"><div class="bbar arr" style="width:'+(arrSeats?Math.max(6,aW):0)+'%"></div></div><span class="n">'+arrSeats+' in</span></div>'+
+        '<div class="db d"><span class="ic">🛫</span><div class="bbar-track"><div class="bbar dep" style="width:'+(depSeats?Math.max(6,dW):0)+'%"></div></div><span class="n">'+depSeats+' out</span></div>'+
+      '</div>'+
+      '<div class="bmeta"><span>'+b.fl.length+' flight'+(b.fl.length>1?'s':'')+'</span>'+(b.wb?'<span class="wb">▪ widebody</span>':'')+blockBadge+'</div>';
+    }else{
+      const cls=DIR==="dep"?"dep":"arr";
+      midHTML='<div class="bbar-track"><div class="bbar '+cls+'" style="width:'+Math.max(6,barW)+'%"></div></div>'+
+        '<div class="bmeta"><span class="seats">'+b.seats+' seats</span><span>'+b.fl.length+' flight'+(b.fl.length>1?'s':'')+'</span>'+(b.wb?'<span class="wb">▪ widebody</span>':'')+blockBadge+'</div>';
+    }
+
     el.innerHTML =
       '<button class="brow" type="button">'+
         '<div class="btime">'+t.a+'<small>'+t.b+'</small></div>'+
-        '<div class="bmid">'+
-          '<div class="bbar-track"><div class="bbar" style="width:'+(b.fl.length?Math.max(6,barW):0)+'%"></div></div>'+
-          '<div class="bmeta">'+(b.fl.length?
-              '<span class="seats">'+b.seats+' seats</span><span>'+b.fl.length+' flight'+(b.fl.length>1?'s':'')+'</span>'+(b.wb?'<span class="wb">▪ widebody</span>':'')+blockBadge
-              :'<span>—</span>')+'</div>'+
-        '</div>'+
+        '<div class="bmid">'+midHTML+'</div>'+
         '<div class="bright">'+(tier?'<span class="tier '+tier+'">'+TIERLABEL[tier]+'</span>':'<span class="chev">·</span>')+
           (b.fl.length?'<span class="chev" data-c>▾ flights</span>':'')+'</div>'+
       '</button>'+
