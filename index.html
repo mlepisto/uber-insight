@@ -660,8 +660,15 @@ function buildBlocks(items,startMin){
 }
 // Unify the day's flights into bucketed items for the active tab.
 function itemsForView(day,isToday){
+  const nowMin = hstNow().getHours()*60+hstNow().getMinutes();
   const arrSrc = (isToday && liveActive && liveFlights) ? liveFlights : flightsForDate(day);
-  const arr = arrSrc.map(f=>Object.assign({},f,{dir:"arr",bucketMin:f.effMin,wkey:f.org}));
+  const arr = arrSrc.map(f=>{
+    const c = Object.assign({},f,{dir:"arr",bucketMin:f.effMin,wkey:f.org});
+    // safety net against stale/estimated feed data: a flight can't be "landed" at a time
+    // that hasn't happened yet — flip a future "landed" back to still-en-route.
+    if(isToday && c.landed && c.effMin > nowMin+2){ c.landed=false; c.hasActual=false; c.landedTxt=null; }
+    return c;
+  });
   const dep = depsForDate(day).map(f=>Object.assign({},f,{dir:"dep",bucketMin:f.leaveMin,wkey:f.dest}));
   let items = DIR==="arr"?arr : DIR==="dep"?dep : arr.concat(dep);
   return items.sort((a,b)=>a.bucketMin-b.bucketMin);
@@ -1013,7 +1020,9 @@ function parseArrivals(arr){
     const schedMin=toMin(schedHM), effMin=toMin(effHM);
     const st=(f.status||"").toLowerCase();
     const cancelled=/cancel/.test(st);
-    const landed=!!runT||/arriv|landed|onblock|gatearriv/.test(st);
+    // status drives "landed", not the presence of an estimated runwayTime (which the
+    // feed also fills for still-en-route planes — that stamped future "landed" times)
+    const landed=/arriv|landed|onblock|gatearriv/.test(st);
     const ap=mv.airport||{};
     const org=(ap.iata||ap.icao||"").toUpperCase();
     const acm=seatFromModel(f.aircraft&&f.aircraft.model);
@@ -1028,7 +1037,7 @@ function parseArrivals(arr){
       inter:INTERISLAND.has(org),
       live:true, status:f.status||"", delayMin:Math.round(delay),
       landed, cancelled, etaTxt: to12(effHM),
-      schedTxt: to12(schedHM), landedTxt: landed?to12(effHM):null, hasActual: !!runT
+      schedTxt: to12(schedHM), landedTxt: landed?to12(effHM):null, hasActual: landed&&!!runT
     });
   });
   // display name fallback: use orgName when not in CITY (override CITY lookup in render via org)

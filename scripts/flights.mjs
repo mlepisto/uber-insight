@@ -45,14 +45,17 @@ function parseArr(raw, isToday){
     const revT=mv.revisedTime&&(mv.revisedTime.local||""), runT=mv.runwayTime&&(mv.runwayTime.local||""), predT=mv.predictedTime&&(mv.predictedTime.local||"");
     const eff=runT||revT||predT||sched; if(!sched&&!eff) continue;
     const schedMin=toMin((sched||eff).slice(11,16)), effMin=toMin((eff||sched).slice(11,16));
-    const st=(f.status||"").toLowerCase(), cancelled=/cancel/.test(st), landed=!!runT||/arriv|landed|onblock|gatearriv/.test(st);
+    // "Landed" must come from STATUS, not from the presence of a runwayTime — the feed
+    // fills in an *estimated* runway time for in-flight planes too, which was stamping
+    // still-en-route arrivals as landed at a future clock time.
+    const st=(f.status||"").toLowerCase(), cancelled=/cancel/.test(st), landed=/arriv|landed|onblock|gatearriv/.test(st);
     const ap=mv.airport||{}, org=(ap.iata||ap.icao||"").toUpperCase(), ac=seatFromModel(f.aircraft&&f.aircraft.model);
     let delay=effMin-schedMin; if(delay>720)delay-=1440; if(delay<-720)delay+=1440;
     out.push({ min:schedMin, effMin, time:(sched||eff).slice(11,16),
       flt:(f.number||"").replace(/\s/g,""), carrier:name, org, orgName:(CITY[org]||ap.name||org),
       seats:ac.s, wb:ac.wb, cls:ac.wb?"Widebody":"Narrowbody", acname:ac.name, inter:INTER.has(org),
       live:!!isToday, status:f.status||"", delayMin:Math.round(delay), landed, cancelled,
-      etaTxt:to12hm(effMin), schedTxt:to12hm(schedMin), landedTxt:landed?to12hm(effMin):null, hasActual:!!runT });
+      etaTxt:to12hm(effMin), schedTxt:to12hm(schedMin), landedTxt:landed?to12hm(effMin):null, hasActual:landed&&!!runT });
   }
   return out.sort((a,b)=>a.effMin-b.effMin);
 }
