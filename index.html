@@ -97,10 +97,16 @@
   .daychip[aria-pressed="true"]{background:var(--board-amber);color:#12242B;border-color:var(--board-amber)}
   .daychip[aria-pressed="true"] small{color:rgba(18,36,43,.7)}
   .daychip.hascruise::after{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--teal);margin-left:5px;vertical-align:middle}
-  .boardnav{display:flex;gap:6px;margin-top:12px}
-  .boardnav a{flex:0 0 auto;text-decoration:none;border:1px solid rgba(244,238,223,.22);color:var(--board-ink);
-    border-radius:999px;padding:6px 15px;font-size:12.5px;font-weight:700;letter-spacing:.02em;line-height:1.2}
-  .boardnav a[aria-current="page"]{background:var(--board-amber);color:#12242B;border-color:var(--board-amber)}
+  .tabs{display:flex;gap:6px;margin-top:12px}
+  .tabs .tab{flex:0 0 auto;border:1px solid rgba(244,238,223,.22);background:transparent;color:var(--board-ink);
+    border-radius:999px;padding:6px 15px;font:inherit;font-size:12.5px;font-weight:700;letter-spacing:.02em;line-height:1.2;cursor:pointer}
+  .tabs .tab[aria-selected="true"]{background:var(--board-amber);color:#12242B;border-color:var(--board-amber)}
+  .dirtag{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:10.5px;letter-spacing:.06em;padding:1px 6px;border-radius:5px;margin-right:5px;text-transform:uppercase;vertical-align:middle}
+  .dirtag.arr{background:var(--accent-soft);color:var(--accent)}
+  .dirtag.dep{background:var(--teal-soft);color:var(--teal)}
+  .assume{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin-top:14px;font-size:13px;color:var(--muted)}
+  .assume b{color:var(--ink)}
+  .assume select{font:inherit;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
 
   /* ---- now card ---- */
   .now{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
@@ -282,17 +288,18 @@
   <header>
     <div class="board-top">
       <div>
-        <div class="board-code">OGG<small>Kahului · Maui Arrivals</small></div>
+        <div class="board-code">OGG<small>Kahului · Maui</small></div>
       </div>
       <div>
         <div class="clock tnum" id="clock">--:--</div>
         <div class="cd" id="clockday">Hawai‘i Time</div>
       </div>
     </div>
-    <nav class="boardnav">
-      <a href="./" aria-current="page">Arrivals</a>
-      <a href="departures.html">Departures</a>
-    </nav>
+    <div class="tabs" id="tabs" role="tablist">
+      <button class="tab" type="button" data-dir="all" role="tab" aria-selected="true">All flights</button>
+      <button class="tab" type="button" data-dir="arr" role="tab" aria-selected="false">Arrivals</button>
+      <button class="tab" type="button" data-dir="dep" role="tab" aria-selected="false">Departures</button>
+    </div>
     <div class="daystrip" id="daystrip"></div>
   </header>
 
@@ -303,7 +310,7 @@
     </div>
     <div class="now-grid" id="nowgrid">
       <div class="stat">
-        <div class="k">This 30-min block</div>
+        <div class="k" id="nowk">This 30-min block</div>
         <div class="v tnum"><span id="nowseats">0</span> <small>seats</small></div>
         <div class="sub" id="nowflights">no arrivals</div>
       </div>
@@ -316,16 +323,26 @@
     <div class="next-wave" id="nextwave"></div>
   </section>
 
+  <div class="assume" id="assume" hidden>
+    <span>Riders leave for OGG about</span>
+    <select id="leadsel" aria-label="Lead time before a mainland departure">
+      <option value="120">2h 00m</option>
+      <option value="150" selected>2h 30m</option>
+      <option value="180">3h 00m</option>
+    </select>
+    <span>before a <b>mainland</b> flight (interisland riders leave 1h later).</span>
+  </div>
+
   <div id="cruisehost"></div>
 
   <div class="seclab">
     <h2 id="daytitle">Today</h2>
-    <span class="hint">30-min waves · seats arriving</span>
+    <span class="hint" id="sechint">30-min waves · total rider demand</span>
   </div>
   <div class="blocks" id="blocks"></div>
 
   <div class="legend">
-    <span><i class="sw" style="background:linear-gradient(90deg,var(--amber),var(--accent))"></i> wave size = seats arriving</span>
+    <span><i class="sw" style="background:linear-gradient(90deg,var(--amber),var(--accent))"></i> wave size = riders in this window</span>
     <span><i class="sw" style="background:var(--teal)"></i> widebody (big load)</span>
     <span><i class="sw" style="background:var(--accent)"></i> peak = best odds</span>
   </div>
@@ -364,7 +381,7 @@
   </details>
 
   <footer>
-    <p><b>How to read it.</b> Each row is a 30-minute window. The bar and seat count are how many arriving seats hit the curb in that window — bigger bar, bigger wave of people needing a ride. Mainland and widebody arrivals are weighted heavier than interisland (visitors with bags and hotel trips beat locals on a short hop). <b>Peak</b> blocks are your best odds; stage before them, not during.</p>
+    <p><b>How to read it.</b> Each row is a 30-minute window, and the tabs up top switch what fills it. <b>Arrivals</b> buckets flights by when they land (people hitting the curb needing a ride out). <b>Departures</b> buckets by when travelers likely head to the airport — flight time minus the lead you set (2h30m mainland default, an hour less interisland). <b>All flights</b> stacks both into one total-demand curve. Bigger bar, bigger wave. Mainland and widebody are weighted heavier than interisland (visitors with bags and hotel trips beat locals on a short hop). <b>Peak</b> blocks are your best odds; stage before them, not during.</p>
     <p><b>On the data.</b> With a key connected, today runs on the live arrivals feed. Without one, and for future days, the board falls back to a realistic <b>typical OGG timetable</b> — real airlines, routes, aircraft and seats, but approximate times — so treat those as a planning pattern. Cruise calls come from an editable schedule (no free live source exists) — <b>confirm dates on the Maui / Kahului Harbor cruise schedule</b> before banking a cruise day.</p>
     <p style="margin-top:8px;color:var(--faint)">Seats are per-aircraft estimates. All times Hawai‘i Standard Time (HST, no DST). Live flight data by <a href="https://aerodatabox.com" target="_blank" rel="noopener">AeroDataBox</a>.</p>
   </footer>
@@ -432,6 +449,44 @@ const WKND = [
   ["21:10","DL621","DL","LAX","A332"]
 ];
 
+// Typical OGG DEPARTURES (HST). [depTime,"FLT","carrier","dest","actype"]
+// Interisland shuttle out — spread across the day.
+const INTER_D = [
+  ["06:00","HA150","HA","HNL","717"],["06:40","HA152","HA","HNL","717"],["07:15","WN1211","WN","HNL","73W"],
+  ["07:40","HA154","HA","HNL","717"],["08:05","HA401","HA","KOA","717"],["08:30","HA156","HA","HNL","717"],
+  ["09:10","HA158","HA","HNL","717"],["09:35","WN1451","WN","HNL","73W"],["10:05","HA160","HA","HNL","717"],
+  ["10:35","HA321","HA","LIH","717"],["11:00","HA162","HA","HNL","717"],["11:45","HA164","HA","HNL","717"],
+  ["12:15","WN2034","WN","HNL","73W"],["12:40","HA166","HA","HNL","717"],["13:15","HA403","HA","KOA","717"],
+  ["13:40","HA168","HA","HNL","717"],["14:20","HA170","HA","HNL","717"],["14:45","WN2211","WN","HNL","73W"],
+  ["15:20","HA172","HA","HNL","717"],["15:45","HA323","HA","LIH","717"],["16:10","HA174","HA","HNL","717"],
+  ["16:50","HA176","HA","HNL","717"],["17:15","WN1876","WN","HNL","73W"],["17:35","HA405","HA","KOA","717"],
+  ["18:00","HA178","HA","HNL","717"],["18:40","HA180","HA","HNL","717"],["19:20","HA182","HA","HNL","717"],
+  ["19:45","WN2462","WN","HNL","73W"],["20:20","HA184","HA","HNL","717"]
+];
+// Mainland / intl departures — cluster midday through late evening (redeyes).
+const MAIN_D = [
+  ["09:30","UA1148","UA","SFO","738"],["10:10","AS866","AS","SFO","739"],["10:45","HA22","HA","SMF","A21N"],
+  ["11:15","WN1901","WN","OAK","7M8"],["11:40","HA4","HA","LAX","A21N"],["12:05","AS822","AS","SEA","739"],
+  ["12:30","AS878","AS","OAK","738"],["12:50","AA284","AA","LAX","321"],["13:15","AS730","AS","PDX","738"],
+  ["13:40","UA490","UA","LAX","739"],["14:00","HA24","HA","SFO","A21N"],["14:20","DL416","DL","LAX","739"],
+  ["14:45","AS834","AS","SJC","738"],["15:05","UA1098","UA","DEN","752"],["15:25","AA662","AA","PHX","321"],
+  ["15:45","HA26","HA","SEA","A21N"],["16:05","DL620","DL","SEA","739"],["16:25","AS890","AS","SAN","739"],
+  ["16:45","HA28","HA","PDX","A21N"],["17:05","WN2289","WN","SJC","738"],["17:25","UA794","UA","SFO","739"],
+  ["17:45","AC1814","AC","YVR","7M8"],["18:05","AA1611","AA","DFW","321"],["18:30","HA8","HA","SAN","A21N"],
+  ["18:55","DL788","DL","SLC","739"],["20:00","HA14","HA","LAS","A21N"],["20:45","UA1730","UA","EWR","788"],
+  ["21:15","HA32","HA","PHX","A21N"],["21:40","WN344","WN","SAN","7M8"],["22:10","HA36","HA","OAK","A21N"],
+  ["22:40","UA1204","UA","SFO","739"],["23:10","HA10","HA","LAX","A332"]
+];
+const WKND_D = [
+  ["10:30","AS460","AS","LAX","739"],["12:00","WN1123","WN","LAS","7M8"],["13:05","DL288","DL","LAX","A332"],
+  ["14:35","AS288","AS","ANC","738"],["15:20","UA362","UA","ORD","788"],["21:55","HA12","HA","SFO","A21N"],
+  ["23:30","DL620","DL","LAX","A332"]
+];
+// Lead time (min before scheduled departure) a traveler heads to OGG. Tunable in-page.
+let LEAD_MAIN = 150;
+const LEAD_GAP = 60; // interisland travelers leave this many min later than mainland
+function leadFor(inter){ return inter ? Math.max(30, LEAD_MAIN - LEAD_GAP) : LEAD_MAIN; }
+
 // Cruise calls at Kahului Harbor. Each visit has an ARRIVAL and a DEPARTURE —
 // those two clock events, not "in port", are what drive rides:
 //   • after arrival: passengers head OGG-ward to grab rental cars  (harbor → airport)
@@ -489,6 +544,26 @@ function flightsForDate(d){
             seats:ac.s,wb:ac.wb,cls:ac.cls,acname:ac.name,inter:INTERISLAND.has(f[3]),
             live:false,status:null,delayMin:0,landed:false,cancelled:false,etaTxt:null};
   }).sort((a,b)=>a.min-b.min);
+}
+// Departures for a date, each carrying leaveMin (when riders head to OGG), computed
+// client-side from the scheduled departure so the lead selector is live.
+function depsForDate(d){
+  const key=ymd(d); let list;
+  if(SCHED && SCHED.deps && SCHED.deps[key] && SCHED.deps[key].length){
+    list = SCHED.deps[key].map(f=>({
+      min:(f.min!=null?f.min:toMin(f.time)), flt:f.flt, carrier:f.carrier, dest:f.dest,
+      seats:f.seats, wb:f.wb, acname:f.acname, inter:!!f.inter,
+      live:!!f.live, status:f.status||null, delayMin:f.delayMin||0, cancelled:!!f.cancelled,
+      destName:f.destName||CITY[f.dest]||f.dest }));
+  } else {
+    const dow=d.getDay(), weekend=(dow===0||dow===5||dow===6);
+    let raw=INTER_D.concat(MAIN_D); if(weekend) raw=raw.concat(WKND_D);
+    list = raw.map(f=>{const ac=AC[f[4]]||{s:150,wb:false,name:f[4]};
+      return {min:toMin(f[0]),flt:f[1],carrier:f[2],dest:f[3],seats:ac.s,wb:ac.wb,acname:ac.name,
+        inter:INTERISLAND.has(f[3]),live:false,status:null,delayMin:0,cancelled:false,destName:CITY[f[3]]||f[3]};});
+  }
+  list.forEach(f=>{ f.leaveMin = Math.max(0, f.min - leadFor(f.inter)); });
+  return list.sort((a,b)=>a.leaveMin-b.leaveMin);
 }
 // Estimate seats/widebody from an aircraft model string (live feed gives free text).
 function seatFromModel(m){
@@ -560,17 +635,27 @@ function cruiseForDate(d){
   return out;
 }
 
-// Build 30-min blocks from 05:00 to 23:30.
-const START=5*60, END=23*60+30;
-function buildBlocks(flights){
+// Build 30-min blocks. Items carry bucketMin (arrival ETA, or leave-for-airport time)
+// and wkey (origin or destination airport) so arrivals, departures and the combined
+// view all bucket the same way.
+const END=23*60+30;
+function buildBlocks(items,startMin){
   const blocks=[];
-  for(let m=START;m<=END;m+=30){
-    const fl = flights.filter(f=>!f.cancelled && f.effMin>=m && f.effMin<m+30);
+  for(let m=startMin;m<=END;m+=30){
+    const fl = items.filter(f=>!f.cancelled && f.bucketMin>=m && f.bucketMin<m+30);
     const seats = fl.reduce((s,f)=>s+f.seats,0);
-    const score = Math.round(fl.reduce((s,f)=>s+f.seats*weight(f.org),0));
+    const score = Math.round(fl.reduce((s,f)=>s+f.seats*weight(f.wkey),0));
     blocks.push({m,fl,seats,score,wb:fl.some(f=>f.wb)});
   }
   return blocks;
+}
+// Unify the day's flights into bucketed items for the active tab.
+function itemsForView(day,isToday){
+  const arrSrc = (isToday && liveActive && liveFlights) ? liveFlights : flightsForDate(day);
+  const arr = arrSrc.map(f=>Object.assign({},f,{dir:"arr",bucketMin:f.effMin,wkey:f.org}));
+  const dep = depsForDate(day).map(f=>Object.assign({},f,{dir:"dep",bucketMin:f.leaveMin,wkey:f.dest}));
+  let items = DIR==="arr"?arr : DIR==="dep"?dep : arr.concat(dep);
+  return items.sort((a,b)=>a.bucketMin-b.bucketMin);
 }
 // Status badge HTML for a flight (live mode).
 function statusBadge(f){
@@ -580,6 +665,13 @@ function statusBadge(f){
   if(f.delayMin>=45) return '<span class="fst verylate">LATE +'+f.delayMin+'m</span>';
   if(f.delayMin>=15) return '<span class="fst late">LATE +'+f.delayMin+'m</span>';
   if(f.etaTxt) return '<span class="fst ontime">'+(f.delayMin<=-5?'EARLY ':'ON TIME · ')+f.etaTxt+'</span>';
+  return '<span class="fst ontime">ON TIME</span>';
+}
+function depBadge(f){
+  if(!f.live) return "";
+  if(f.cancelled) return '<span class="fst cxl">CANCELLED</span>';
+  if(f.delayMin>=45) return '<span class="fst verylate">DELAYED +'+f.delayMin+'m</span>';
+  if(f.delayMin>=15) return '<span class="fst late">DELAYED +'+f.delayMin+'m</span>';
   return '<span class="fst ontime">ON TIME</span>';
 }
 function tierFor(score,maxScore){
@@ -601,6 +693,7 @@ function fmtBlock(m){
 
 /* ============================ STATE + RENDER ============================ */
 let SEL=0; // day offset
+let DIR="all"; // "all" | "arr" | "dep" — which board tab is active
 let liveFlights=null;   // real arrivals array when browser "Go live" is on (today only)
 let liveActive=false;
 let liveUpdated=0;      // epoch ms of last successful browser fetch
@@ -614,8 +707,14 @@ function render(){
   const now = hstNow();
   const day = addDays(now, SEL);
   const isToday = SEL===0;
-  const flights = (isToday && liveActive && liveFlights) ? liveFlights : flightsForDate(day);
-  const blocks = buildBlocks(flights);
+  const flights = itemsForView(day,isToday);
+  const startMin = (DIR==="arr")?5*60:3*60;   // departures head out before dawn; arrivals start ~5am
+  const allBlocks = buildBlocks(flights,startMin);
+  // trim leading/trailing empty blocks so each tab starts and ends on real demand
+  let bA=0,bZ=allBlocks.length-1;
+  while(bA<bZ && !allBlocks[bA].fl.length) bA++;
+  while(bZ>bA && !allBlocks[bZ].fl.length) bZ--;
+  const blocks = allBlocks.slice(bA,bZ+1);
   const maxScore = Math.max(1,...blocks.map(b=>b.score));
   const maxSeats = Math.max(1,...blocks.map(b=>b.seats));
   const nowMin = now.getHours()*60+now.getMinutes();
@@ -623,6 +722,13 @@ function render(){
   // day title
   $("#daytitle").textContent = SEL===0?"Today · "+DOW[day.getDay()]+" "+MON[day.getMonth()]+" "+day.getDate()
     : DOW[day.getDay()]+" · "+MON[day.getMonth()]+" "+day.getDate();
+
+  // tab-dependent copy
+  const noun = DIR==="dep"?"departures":DIR==="arr"?"arrivals":"flights";
+  $("#sechint").textContent = DIR==="dep"?"30-min waves · seats heading to airport"
+    : DIR==="arr"?"30-min waves · seats arriving" : "30-min waves · total rider demand";
+  $("#nowk").textContent = DIR==="dep"?"Heading to OGG now":"This 30-min block";
+  $("#assume").hidden = (DIR==="arr");
 
   // cruise
   const cruises = cruiseForDate(day);
@@ -658,15 +764,17 @@ function render(){
     pulse.hidden=false; grid.hidden=false; btn.hidden=false; src.hidden=false;
     const cur = blocks.find(b=>nowMin>=b.m && nowMin<b.m+30);
     $("#nowseats").textContent = cur?cur.seats:0;
-    $("#nowflights").textContent = cur&&cur.fl.length? cur.fl.length+" flight"+(cur.fl.length>1?"s":"")+" landing" : "no arrivals this block";
-    const soon = flights.filter(f=>!f.cancelled && f.effMin>=nowMin && f.effMin<nowMin+60);
+    const curVerb = DIR==="dep"?" heading out":DIR==="arr"?" landing":" in this window";
+    const curNone = DIR==="dep"?"no departures this block":DIR==="arr"?"no arrivals this block":"nothing this block";
+    $("#nowflights").textContent = cur&&cur.fl.length? cur.fl.length+" flight"+(cur.fl.length>1?"s":"")+curVerb : curNone;
+    const soon = flights.filter(f=>!f.cancelled && f.bucketMin>=nowMin && f.bucketMin<nowMin+60);
     $("#soonseats").textContent = soon.reduce((s,f)=>s+f.seats,0);
     $("#soonflights").textContent = "across "+soon.length+" flight"+(soon.length!==1?"s":"");
     refreshStatusUI();
   }else{
     // Future day: no "right now", no live. Just a compact outlook line.
     const tot=flights.reduce((s,f)=>s+f.seats,0), wb=flights.filter(f=>f.wb).length;
-    $("#nowlabel").textContent = DOW[day.getDay()]+" outlook · "+flights.length+" arrivals · "+tot.toLocaleString()+" seats"+(wb?" · "+wb+" widebody":"");
+    $("#nowlabel").textContent = DOW[day.getDay()]+" outlook · "+flights.length+" "+noun+" · "+tot.toLocaleString()+" seats"+(wb?" · "+wb+" widebody":"");
     pulse.hidden=true; grid.hidden=true; btn.hidden=true; src.hidden=true; src.textContent="";
   }
 
@@ -704,16 +812,25 @@ function render(){
     const barW = Math.round(b.seats/maxSeats*100);
     let flHTML="";
     b.fl.forEach(f=>{
-      let sub="";
-      if(f.live){
-        if(f.landed) sub=(f.hasActual?"Landed ":"Arrived ~")+f.landedTxt+(f.delayMin>=1?" · +"+f.delayMin+"m late":(f.delayMin<=-1?" · "+(-f.delayMin)+"m early":" · on time"));
-        else if(f.cancelled) sub="Scheduled "+f.schedTxt;
-        else sub="Sched "+f.schedTxt+" → ETA "+f.etaTxt;
+      const tag = DIR==="all" ? '<span class="dirtag '+f.dir+'">'+(f.dir==="dep"?"Dep":"Arr")+'</span>' : "";
+      if(f.dir==="dep"){
+        const sub="Departs "+to12hm(f.min)+" · leave by ~"+to12hm(f.leaveMin)+(f.live&&f.delayMin>=15?" · dep +"+f.delayMin+"m":"");
+        flHTML+='<div class="flt"><div class="ft">'+f.flt+'</div>'+
+          '<div class="fo">'+tag+'<b>'+(AIRLINE[f.carrier]||f.carrier)+'</b> <span>to '+(f.destName||CITY[f.dest]||f.dest)+(f.inter?" (interisland)":"")+'</span> '+depBadge(f)+
+          '<div class="fsub">'+sub+'</div></div>'+
+          '<div class="fac"><b>'+f.seats+' seats</b>'+f.acname+(f.wb?' <span class="tag-wb">▪ widebody</span>':'')+'</div></div>';
+      }else{
+        let sub="";
+        if(f.live){
+          if(f.landed) sub=(f.hasActual?"Landed ":"Arrived ~")+f.landedTxt+(f.delayMin>=1?" · +"+f.delayMin+"m late":(f.delayMin<=-1?" · "+(-f.delayMin)+"m early":" · on time"));
+          else if(f.cancelled) sub="Scheduled "+f.schedTxt;
+          else sub="Sched "+f.schedTxt+" → ETA "+f.etaTxt;
+        }
+        flHTML+='<div class="flt"><div class="ft">'+f.flt+'</div>'+
+          '<div class="fo">'+tag+'<b>'+(AIRLINE[f.carrier]||f.carrier)+'</b> <span>from '+(CITY[f.org]||f.org)+(f.inter?" (interisland)":"")+'</span> '+statusBadge(f)+
+          (sub?'<div class="fsub">'+sub+'</div>':'')+'</div>'+
+          '<div class="fac"><b>'+f.seats+' seats</b>'+f.acname+(f.wb?' <span class="tag-wb">▪ widebody</span>':'')+'</div></div>';
       }
-      flHTML+='<div class="flt"><div class="ft">'+f.flt+'</div>'+
-        '<div class="fo"><b>'+(AIRLINE[f.carrier]||f.carrier)+'</b> <span>from '+(CITY[f.org]||f.org)+(f.inter?" (interisland)":"")+'</span> '+statusBadge(f)+
-        (sub?'<div class="fsub">'+sub+'</div>':'')+'</div>'+
-        '<div class="fac"><b>'+f.seats+' seats</b>'+f.acname+(f.wb?' <span class="tag-wb">▪ widebody</span>':'')+'</div></div>';
     });
     // worst live status for the block meta line
     let blockBadge="";
@@ -1051,6 +1168,15 @@ function requestUpdate(){
   loadData().then(()=>{ setLiveState(SCHED?"ok":"off"); if(SCHED){ const src=$("#srcnote"); if(src){ src.className="srcinline live"; src.textContent=" · refreshed from auto feed"; setTimeout(refreshStatusUI,1600);} } });
 }
 $("#updatebtn").addEventListener("click",requestUpdate);
+// tab switching (All flights / Arrivals / Departures) — filters in place, no navigation
+document.querySelectorAll("#tabs .tab").forEach(t=>{
+  t.addEventListener("click",()=>{
+    DIR=t.getAttribute("data-dir");
+    document.querySelectorAll("#tabs .tab").forEach(x=>x.setAttribute("aria-selected", x===t?"true":"false"));
+    render._scrolled=false; render();
+  });
+});
+$("#leadsel").addEventListener("change",e=>{ LEAD_MAIN=+e.target.value; render(); });
 buildStrip();
 loadCache();              // instant: show the last good pull (today only) — hits no API
 tick();
