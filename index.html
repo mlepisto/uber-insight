@@ -97,6 +97,10 @@
   .daychip[aria-pressed="true"]{background:var(--board-amber);color:#12242B;border-color:var(--board-amber)}
   .daychip[aria-pressed="true"] small{color:rgba(18,36,43,.7)}
   .daychip.hascruise::after{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--teal);margin-left:5px;vertical-align:middle}
+  .boardnav{display:flex;gap:6px;margin-top:12px}
+  .boardnav a{flex:0 0 auto;text-decoration:none;border:1px solid rgba(244,238,223,.22);color:var(--board-ink);
+    border-radius:999px;padding:6px 15px;font-size:12.5px;font-weight:700;letter-spacing:.02em;line-height:1.2}
+  .boardnav a[aria-current="page"]{background:var(--board-amber);color:#12242B;border-color:var(--board-amber)}
 
   /* ---- now card ---- */
   .now{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
@@ -285,6 +289,10 @@
         <div class="cd" id="clockday">Hawai‘i Time</div>
       </div>
     </div>
+    <nav class="boardnav">
+      <a href="./" aria-current="page">Arrivals</a>
+      <a href="departures.html">Departures</a>
+    </nav>
     <div class="daystrip" id="daystrip"></div>
   </header>
 

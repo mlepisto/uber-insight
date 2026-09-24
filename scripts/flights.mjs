@@ -1,14 +1,17 @@
-// Rolling 5-day OGG arrival schedule -> data/flights.json (render-ready for the app & email).
-// Runs on GitHub Actions. Today is re-fetched each run (baseline day-of status); future days
-// are fetched once as they roll into the window and then reused; past days are dropped.
-// Browser "Update" still does a fresh day-of pull on top of this for to-the-minute delays.
+// Rolling 7-day OGG arrivals + departures -> data/flights.json (render-ready).
+// Runs on GitHub Actions. Today re-fetched each run; future days fetched once as they
+// roll into the window, then reused; past days dropped. The airport feed returns BOTH
+// directions in one call, so departures cost no extra API units.
+// Departures carry a leaveMin = when riders head to the airport (dep time - lead).
 // Env: AERODATABOX_KEY (required).
 import { readFileSync, writeFileSync } from "node:fs";
 
 const KEY = process.env.AERODATABOX_KEY;
 if(!KEY){ console.log("No AERODATABOX_KEY — leaving data/flights.json unchanged."); process.exit(0); }
 const OUT = "data/flights.json";
-const DAYS = 7; // today + next 6
+const DAYS = 7;
+const LEAD_MAINLAND = 150; // min before departure a mainland/intl traveler heads to OGG
+const LEAD_INTER = 90;     // interisland travelers show up later
 
 const pad=n=>String(n).padStart(2,"0");
 const toMin=t=>{const[a,b]=t.split(":").map(Number);return a*60+b;};
@@ -33,17 +36,7 @@ function hstDate(off){ const h=new Date(Date.now()-10*3600*1000); const d=new Da
 let QUOTA=null;
 function readQuota(r){ const q={}; r.headers.forEach((v,k)=>{ k=k.toLowerCase(); if(k.startsWith("x-ratelimit-")&&k.endsWith("-remaining")) q[k.slice(12,-10)]=v; }); if(Object.keys(q).length) QUOTA=q; }
 
-async function fetchDay(dateStr, isToday){
-  const base="https://aerodatabox.p.rapidapi.com/flights/airports/icao/PHOG/";
-  const opt="?direction=Arrival&withLeg=false&withCancelled=true&withCodeshared=false&withCargo=false&withPrivate=false&withLocation=false";
-  const hdr={headers:{"X-RapidAPI-Key":KEY,"X-RapidAPI-Host":"aerodatabox.p.rapidapi.com"}};
-  let raw=[];
-  for(const [a,b] of [["00:00","11:59"],["12:00","23:59"]]){
-    const r=await fetch(base+dateStr+"T"+a+"/"+dateStr+"T"+b+opt,hdr);
-    readQuota(r);
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const j=await r.json(); raw=raw.concat(j.arrivals||[]);
-  }
+function parseArr(raw, isToday){
   const out=[];
   for(const f of raw){
     const name=(f.airline&&f.airline.name)||""; if(f.isCargo===true||CARGO_RE.test(name)) continue;
@@ -51,12 +44,11 @@ async function fetchDay(dateStr, isToday){
     const sched=mv.scheduledTime&&(mv.scheduledTime.local||"");
     const revT=mv.revisedTime&&(mv.revisedTime.local||""), runT=mv.runwayTime&&(mv.runwayTime.local||""), predT=mv.predictedTime&&(mv.predictedTime.local||"");
     const eff=runT||revT||predT||sched; if(!sched&&!eff) continue;
-    const schedHM=(sched||eff).slice(11,16), effHM=(eff||sched).slice(11,16);
-    const schedMin=toMin(schedHM), effMin=toMin(effHM);
+    const schedMin=toMin((sched||eff).slice(11,16)), effMin=toMin((eff||sched).slice(11,16));
     const st=(f.status||"").toLowerCase(), cancelled=/cancel/.test(st), landed=!!runT||/arriv|landed|onblock|gatearriv/.test(st);
     const ap=mv.airport||{}, org=(ap.iata||ap.icao||"").toUpperCase(), ac=seatFromModel(f.aircraft&&f.aircraft.model);
     let delay=effMin-schedMin; if(delay>720)delay-=1440; if(delay<-720)delay+=1440;
-    out.push({ min:schedMin, effMin, time:schedHM,   // effMin = actual/revised/predicted — early flights bucket earlier too
+    out.push({ min:schedMin, effMin, time:(sched||eff).slice(11,16),
       flt:(f.number||"").replace(/\s/g,""), carrier:name, org, orgName:(CITY[org]||ap.name||org),
       seats:ac.s, wb:ac.wb, cls:ac.wb?"Widebody":"Narrowbody", acname:ac.name, inter:INTER.has(org),
       live:!!isToday, status:f.status||"", delayMin:Math.round(delay), landed, cancelled,
@@ -65,19 +57,55 @@ async function fetchDay(dateStr, isToday){
   return out.sort((a,b)=>a.effMin-b.effMin);
 }
 
+function parseDep(raw, isToday){
+  const out=[];
+  for(const f of raw){
+    const name=(f.airline&&f.airline.name)||""; if(f.isCargo===true||CARGO_RE.test(name)) continue;
+    const mv=f.movement||f.departure||{};
+    const sched=mv.scheduledTime&&(mv.scheduledTime.local||"");
+    const revT=mv.revisedTime&&(mv.revisedTime.local||""), predT=mv.predictedTime&&(mv.predictedTime.local||"");
+    const eff=revT||predT||sched; if(!sched&&!eff) continue;
+    const schedMin=toMin((sched||eff).slice(11,16)), effMin=toMin((eff||sched).slice(11,16));
+    const st=(f.status||"").toLowerCase(), cancelled=/cancel/.test(st);
+    const ap=mv.airport||{}, dest=(ap.iata||ap.icao||"").toUpperCase(), ac=seatFromModel(f.aircraft&&f.aircraft.model);
+    const inter=INTER.has(dest), lead=inter?LEAD_INTER:LEAD_MAINLAND, leaveMin=Math.max(0,schedMin-lead);
+    let delay=effMin-schedMin; if(delay>720)delay-=1440; if(delay<-720)delay+=1440;
+    out.push({ min:schedMin, leaveMin, time:(sched||eff).slice(11,16),
+      flt:(f.number||"").replace(/\s/g,""), carrier:name, dest, destName:(CITY[dest]||ap.name||dest),
+      seats:ac.s, wb:ac.wb, cls:ac.wb?"Widebody":"Narrowbody", acname:ac.name, inter,
+      live:!!isToday, status:f.status||"", delayMin:Math.round(delay), cancelled,
+      depTxt:to12hm(schedMin), leaveTxt:to12hm(leaveMin), lead });
+  }
+  return out.sort((a,b)=>a.leaveMin-b.leaveMin);
+}
+
+async function fetchDay(dateStr, isToday){
+  const base="https://aerodatabox.p.rapidapi.com/flights/airports/icao/PHOG/";
+  const opt="?direction=Both&withLeg=false&withCancelled=true&withCodeshared=false&withCargo=false&withPrivate=false&withLocation=false";
+  const hdr={headers:{"X-RapidAPI-Key":KEY,"X-RapidAPI-Host":"aerodatabox.p.rapidapi.com"}};
+  let arrRaw=[], depRaw=[];
+  for(const [a,b] of [["00:00","11:59"],["12:00","23:59"]]){
+    const r=await fetch(base+dateStr+"T"+a+"/"+dateStr+"T"+b+opt,hdr);
+    readQuota(r);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const j=await r.json(); arrRaw=arrRaw.concat(j.arrivals||[]); depRaw=depRaw.concat(j.departures||[]);
+  }
+  return { arr: parseArr(arrRaw, isToday), dep: parseDep(depRaw, isToday) };
+}
+
 async function main(){
   const today=hstDate(0);
   const want=[]; for(let i=0;i<DAYS;i++) want.push(hstDate(i));
-  let prev={}; try{ prev=JSON.parse(readFileSync(OUT,"utf8")).days||{}; }catch(e){}
-  const days={}; let calls=0;
+  let prevD={}, prevDep={}; try{ const j=JSON.parse(readFileSync(OUT,"utf8")); prevD=j.days||{}; prevDep=j.deps||{}; }catch(e){}
+  const days={}, deps={}; let calls=0;
   for(const d of want){
     const isToday=d===today;
-    if(!isToday && prev[d] && prev[d].length){ days[d]=prev[d]; continue; }   // reuse cached future day
-    try{ days[d]=await fetchDay(d, isToday); calls+=2; console.log(d,(isToday?"[today] ":""),days[d].length,"arrivals"); }
-    catch(e){ console.error("day",d,e.message); if(prev[d]) days[d]=prev[d]; }
+    if(!isToday && prevD[d] && prevD[d].length && prevDep[d]){ days[d]=prevD[d]; deps[d]=prevDep[d]; continue; }
+    try{ const {arr,dep}=await fetchDay(d,isToday); days[d]=arr; deps[d]=dep; calls+=2; console.log(d,(isToday?"[today] ":""),arr.length,"arr",dep.length,"dep"); }
+    catch(e){ console.error("day",d,e.message); if(prevD[d]){ days[d]=prevD[d]; deps[d]=prevDep[d]||[]; } }
   }
   if(!Object.keys(days).length){ console.error("nothing fetched; leaving file"); process.exit(0); }
-  writeFileSync(OUT, JSON.stringify({airport:"OGG",updated:new Date().toISOString(),day:today,days,quota:QUOTA},null,1)+"\n");
+  writeFileSync(OUT, JSON.stringify({airport:"OGG",updated:new Date().toISOString(),day:today,days,deps,quota:QUOTA},null,1)+"\n");
   console.log("Wrote",OUT,"| API calls this run:",calls,"| quota:",JSON.stringify(QUOTA));
 }
 main().catch(e=>{ console.error(e); process.exit(1); });
